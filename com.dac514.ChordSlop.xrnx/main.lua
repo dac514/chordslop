@@ -21,15 +21,44 @@ package.path = bundle_path .. "?.lua;" .. package.path
 -- Renoise can reload this tool by itself whenever its window regains focus after
 -- a file changed (`_AUTO_RELOAD_DEBUG = true`). It is off here because opening a
 -- dialog counts as "regaining focus", which makes `just reload-soft` unreliable;
--- `just reload` does a full reload through OSC instead. Enable it if you edit in
--- an external editor and like alt-tab reloads.
+-- `just reload` does a full reload through OSC instead.
 _AUTO_RELOAD_DEBUG = false
 
 -- Preferences: created once per tool load; Renoise persists them as
 -- preferences.xml inside the tool folder.
+--
+-- The preset model must be registered before the preferences document exists:
+-- Renoise instantiates the items of `presets` from preferences.xml at that moment.
 if not renoise.tool().preferences then
-  renoise.tool().preferences = renoise.Document.create "MyToolPreferences" {
-    greeting = "Hello from My Tool",
+  renoise.Document.create "ChordSlopPreset" {
+    name = "",
+    roots = { 0 },
+    types = { 0 },
+    inversions = { 0 },
+    octaves = { 4 },
+  }
+
+  local function sixteen(value)
+    local list = {}
+    for i = 1, 16 do
+      list[i] = value
+    end
+    return list
+  end
+
+  renoise.tool().preferences = renoise.Document.create "ChordSlopPreferences" {
+    midi_device = "",
+    midi_base_note = 36, -- C1: AKAI MPK mini pad 1, bank A
+    qwerty_enabled = true,
+    animate = true,
+    root_key = 0, -- pitch class 0-11
+    mode = 1, -- 1 Ionian .. 7 Locrian
+    transpose_pads = true,
+    pad_roots = sixteen(0),
+    pad_types = sixteen(0), -- 0 = empty pad; first run loads the first factory preset
+    pad_inversions = sixteen(0),
+    pad_octaves = sixteen(4),
+    presets = renoise.Document.DocumentList(),
   }
 end
 

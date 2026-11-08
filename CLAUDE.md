@@ -6,7 +6,7 @@ command-line tooling to format, type-check, install, reload and inspect it while
 ## What you are working on
 
 - The tool is the single `*.xrnx/` folder in the repo root
-  (`com.example.MyTool.xrnx/` until `just init` renames it). Everything else is tooling.
+  (`com.dac514.ChordSlop.xrnx/` until `just init` renames it). Everything else is tooling.
 - Lua dialect: **LuaJIT** = Lua 5.1 syntax (`unpack`, `loadstring`, `setfenv`;
   `bit` is built in; no `goto`, no `//`, no integer subtype).
 - Renoise API version **6.2** (Renoise 3.5). The API reference is vendored in

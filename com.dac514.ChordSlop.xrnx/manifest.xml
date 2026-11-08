@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RenoiseScriptingTool doc_version="0">
+  <ApiVersion>6.2</ApiVersion>
+  <Id>com.dac514.ChordSlop</Id>
+  <Version>1.00</Version>
+  <Author>Dac Chartrand [dac.chartrand@gmail.com]</Author>
+  <Name>ChordSlop</Name>
+  <Category>Pattern Editor</Category>
+  <Description>Chord pads for Renoise: 16 chord pads with a Circle of Fifths assistant, playable from the mouse, a MIDI controller or the QWERTY keyboard, recording straight into the pattern editor.</Description>
+  <Platform>Windows, Mac, Linux</Platform>
+  <License>MIT</License>
+  <DocumentationPath>README.md</DocumentationPath>
+  <Homepage>https://github.com/dac514/chordslop</Homepage>
+</RenoiseScriptingTool>

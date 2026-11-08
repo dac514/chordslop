@@ -52,6 +52,7 @@ if not renoise.tool().preferences then
   renoise.tool().preferences = renoise.Document.create "ChordSlopPreferences" {
     midi_device = "",
     midi_base_note = 36, -- C1: AKAI MPK mini pad 1, bank A
+    midi_layout = 3, -- index into input.LAYOUTS; MPK mini banks by default
     qwerty_enabled = true,
     animate = true,
     root_key = 0, -- pitch class 0-11

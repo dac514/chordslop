@@ -29,6 +29,35 @@ t.eq(input.midi_pad(51, 36), 16, "base + 15 is pad 16")
 t.eq(input.midi_pad(52, 36), nil, "above range")
 t.eq(input.midi_pad(35, 36), nil, "below range")
 
+-- layouts
+t.eq(#input.LAYOUTS, 3, "three layouts")
+for layout = 1, #input.LAYOUTS do
+  local seen = {}
+  for offset = 0, 15 do
+    local pad = input.layout_pad(offset, layout)
+    t.check(
+      pad >= 1 and pad <= 16 and not seen[pad],
+      ("layout %d offset %d maps to a unique pad"):format(layout, offset)
+    )
+    seen[pad] = true
+    t.eq(
+      input.layout_offset(pad, layout),
+      offset,
+      ("layout %d inverse of offset %d"):format(layout, offset)
+    )
+  end
+end
+t.eq(input.layout_pad(0, 1), 1, "rows: first note is pad 1 (top-left)")
+t.eq(input.layout_pad(0, 2), 13, "bottom: first note is pad 13 (bottom-left)")
+t.eq(input.layout_pad(15, 2), 4, "bottom: last note is pad 4 (top-right)")
+t.eq(input.layout_pad(0, 3), 5, "banks: bank A pad 1 is the second tool row")
+t.eq(input.layout_pad(4, 3), 1, "banks: bank A pad 5 is the top tool row")
+t.eq(input.layout_pad(8, 3), 13, "banks: bank B pad 1 is the bottom tool row")
+t.eq(input.layout_pad(12, 3), 9, "banks: bank B pad 5 is the third tool row")
+t.eq(input.midi_pad(36, 36, 3), 5, "midi_pad honours the layout")
+t.eq(input.pad_note(1, 36, 3), 40, "pad_note is the inverse")
+t.eq(input.pad_note(1, 36), 36, "pad_note defaults to rows")
+
 t.eq(input.qwerty_pad(0), 1, "z is pad 1")
 t.eq(input.qwerty_pad(15), 16, "3 is pad 16")
 t.eq(input.qwerty_pad(16), nil, "beyond pads")

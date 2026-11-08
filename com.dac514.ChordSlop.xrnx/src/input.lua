@@ -36,16 +36,73 @@ function M.decode(message)
   return nil
 end
 
----Pad index for a MIDI note, given the note of pad 1.
+---@class PadLayout
+---@field id "rows"|"bottom"|"banks"
+---@field name string
+
+---How the 16 chromatic controller notes land on the 4x4 grid (pads are
+---numbered in reading order, top-left first).
+---@type PadLayout[]
+M.LAYOUTS = {
+  { id = "rows", name = "Rows top to bottom" },
+  { id = "bottom", name = "Rows bottom to top" },
+  { id = "banks", name = "MPK mini banks" },
+}
+
+local ROW = 4
+
+---Grid pad for a controller note offset (0 = the base note).
+---@param offset integer 0-15
+---@param layout integer Index into M.LAYOUTS.
+---@return integer pad 1-16
+function M.layout_pad(offset, layout)
+  local id = (M.LAYOUTS[layout] or M.LAYOUTS[1]).id
+  if id == "bottom" then
+    -- lowest notes on the bottom row, like a drum machine
+    local row, col = math.floor(offset / ROW), offset % ROW
+    return (3 - row) * ROW + col + 1
+  elseif id == "banks" then
+    -- two rows per bank: the lower four notes of a bank are its bottom row
+    local bank, within = math.floor(offset / (2 * ROW)), offset % (2 * ROW)
+    local flipped = within < ROW and within + ROW or within - ROW
+    return bank * 2 * ROW + flipped + 1
+  end
+  return offset + 1
+end
+
+---Controller note offset that plays a grid pad (inverse of `layout_pad`).
+---@param pad integer 1-16
+---@param layout integer
+---@return integer offset 0-15
+function M.layout_offset(pad, layout)
+  for offset = 0, M.PAD_COUNT - 1 do
+    if M.layout_pad(offset, layout) == pad then
+      return offset
+    end
+  end
+  return pad - 1
+end
+
+---Pad index for a MIDI note, given the note of pad 1 and the layout.
 ---@param note integer
 ---@param base integer
+---@param layout integer? Index into M.LAYOUTS (default 1).
 ---@return integer? 1-16
-function M.midi_pad(note, base)
-  local index = note - base + 1
-  if index >= 1 and index <= M.PAD_COUNT then
-    return index
+function M.midi_pad(note, base, layout)
+  local offset = note - base
+  if offset >= 0 and offset < M.PAD_COUNT then
+    return M.layout_pad(offset, layout or 1)
   end
   return nil
+end
+
+---MIDI note that plays a pad, given the base note and the layout.
+---@param pad integer 1-16
+---@param base integer
+---@param layout integer?
+---@return integer
+function M.pad_note(pad, base, layout)
+  return base + M.layout_offset(pad, layout or 1)
 end
 
 ---Pad index for a dialog key event's virtual piano key.

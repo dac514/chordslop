@@ -60,14 +60,27 @@ local TIP_MODE = "Mode: the scale built on the key (major, minor, Dorian...). "
   .. "It decides which chords count as in key (green), how the circle is shaded and how presets are spelled."
 local TIP_PRESET_BASE = "Presets are ready-made layouts of 16 chords; pick one and it lands on the pads. "
   .. "Factory presets are written as scale degrees and render into the current key; so do the ones you save."
-local TIP_MIDI_BASE = "The MIDI note that plays pad 1; pads 2-16 answer to the next 15 notes up. "
-  .. "Default C-3 (note 36) is pad 1 of bank A on an AKAI MPK mini. Or press Learn and hit a pad."
+local TIP_MIDI_BASE = "The lowest MIDI note of the controller pads; the 16 pads answer to this note and the "
+  .. "15 above it, arranged by the layout next to it. Default C-3 (note 36) is pad 1 of bank A on an AKAI "
+  .. "MPK mini. Or press Learn and hit that pad."
+local TIP_LAYOUT = "How the 16 controller notes land on the grid. Rows top to bottom: lowest note top-left. "
+  .. "Rows bottom to top: lowest note bottom-left, like a drum machine. MPK mini banks: bank A on the top "
+  .. "two rows and bank B below, each laid out like the controller (pads 1-4 bottom, 5-8 top)."
 
 ---@return string[]
 local function mode_items()
   local items = {}
   for i, mode in ipairs(theory.MODES) do
     items[i] = mode.name
+  end
+  return items
+end
+
+---@return string[]
+local function layout_items()
+  local items = {}
+  for i, layout in ipairs(input.LAYOUTS) do
+    items[i] = layout.name
   end
   return items
 end
@@ -200,7 +213,7 @@ function M.build(app, palette)
     button.tooltip = ("Pad %d · key %s · MIDI %s"):format(
       i,
       input.PAD_KEYS[i],
-      note_label(prefs.midi_base_note.value + i - 1)
+      note_label(input.pad_note(i, prefs.midi_base_note.value, prefs.midi_layout.value))
     )
     label.text = numeral
     label.style = (i == ctl.selected) and "strong" or "normal"
@@ -999,7 +1012,7 @@ function M.build(app, palette)
           app.set_midi_device(name)
         end),
       },
-      vb:text { text = "Pad 1 note", style = "disabled", tooltip = TIP_MIDI_BASE },
+      vb:text { text = "Low note", style = "disabled", tooltip = TIP_MIDI_BASE },
       vb:valuebox {
         id = "midi_base",
         width = 64,
@@ -1016,10 +1029,20 @@ function M.build(app, palette)
       vb:button {
         id = "learn",
         text = "Learn",
-        tooltip = "Press, then hit the controller pad you want as pad 1; the other pads follow chromatically",
+        tooltip = "Press, then hit the controller pad that sends the lowest note; the other pads follow chromatically",
         notifier = app.guard(function()
           ctl.learn_armed = not ctl.learn_armed
           refresh_learn()
+        end),
+      },
+      vb:popup {
+        id = "midi_layout",
+        width = 150,
+        items = layout_items(),
+        bind = prefs.midi_layout,
+        tooltip = TIP_LAYOUT,
+        notifier = app.guard(function()
+          refresh_pads()
         end),
       },
       vb:space { width = GAP },

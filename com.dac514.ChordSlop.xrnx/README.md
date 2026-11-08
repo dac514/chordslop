@@ -44,11 +44,14 @@ it on the pads; hover the list for a one-line description. *Save* stores the cur
 also relative to the key, so your presets transpose like the factory ones.
 *Delete* removes the selected preset of yours.
 
-**MIDI.** Pick an input device. Pads 1 to 16 answer to sixteen chromatic notes
-starting at the *Pad 1* note (C-3, MIDI note 36, by default: pad 1 of an AKAI
-MPK mini in bank A, with bank B landing on pads 9 to 16). Press *Learn*, then
-hit the controller pad you want as pad 1. Velocity is recorded when the
-instrument's velocity column is in use.
+**MIDI.** Pick an input device. The sixteen pads answer to sixteen chromatic
+notes starting at the *Low note* (C-3, MIDI note 36, by default: pad 1 of an
+AKAI MPK mini in bank A). Press *Learn*, then hit the controller pad that sends
+the lowest note. The *layout* list says how those notes land on the grid:
+*MPK mini banks* (default) puts bank A on the top two rows and bank B below,
+each arranged like the controller itself; *Rows top to bottom* counts from the
+top-left pad; *Rows bottom to top* counts from the bottom-left like a drum
+machine. Velocity is recorded when the instrument's velocity column is in use.
 
 **QWERTY.** While the ChordSlop window has focus, Renoise's piano keys play the
 pads: `z s x d c v g b h n j m` for pads 1 to 12 and `q 2 w 3` for 13 to 16.

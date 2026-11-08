@@ -24,6 +24,7 @@ local App = {}
 ---@class ChordSlopPreferences : renoise.Document.DocumentNode
 ---@field midi_device renoise.Document.ObservableString
 ---@field midi_base_note renoise.Document.ObservableNumber
+---@field midi_layout renoise.Document.ObservableNumber
 ---@field qwerty_enabled renoise.Document.ObservableBoolean
 ---@field animate renoise.Document.ObservableBoolean
 ---@field root_key renoise.Document.ObservableNumber
@@ -240,7 +241,8 @@ function App.on_midi(message)
     ctl.learned(event.note)
     return
   end
-  local pad = input.midi_pad(event.note, App.prefs().midi_base_note.value)
+  local prefs = App.prefs()
+  local pad = input.midi_pad(event.note, prefs.midi_base_note.value, prefs.midi_layout.value)
   if not pad then
     return
   end

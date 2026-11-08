@@ -12,7 +12,10 @@ local function names(pads, key, mode)
   return table.concat(out, " ")
 end
 
-t.check(#presets.FACTORY >= 8, "a good handful of factory presets")
+t.check(#presets.FACTORY >= 20, "a generous set of factory presets")
+for _, preset in ipairs(presets.FACTORY) do
+  t.check(type(preset.desc) == "string" and #preset.desc > 10, preset.name .. " has a description")
+end
 t.eq(#presets.names(), #presets.FACTORY, "names match presets")
 
 -- every preset renders in every key and mode without errors and stays in range
@@ -70,5 +73,26 @@ local jazz = presets.render(find "Jazz", 0, 1)
 t.eq(theory.chord_name(jazz[10].root, jazz[10].type, false), "F#m7b5", "#iv half-diminished")
 t.eq(theory.chord_name(jazz[13].root, jazz[13].type, true), "Db7", "tritone sub bII7")
 t.eq(jazz[16].inversion, 2, "inversion carried")
+
+-- capture: pads -> relative preset -> pads round trip
+local source = presets.render(find "Jazz", 2, 1) -- D major
+local captured = presets.capture(source, 2, 1, "mine")
+t.eq(captured.name, "mine", "captured name")
+t.eq(captured.mode, 1, "captured mode")
+t.eq(captured.pads[10].a, -1, "altered root captured as a flat (bV spelled as flat)")
+local back = presets.render(captured, 2, 1)
+for i = 1, 16 do
+  t.eq(
+    names({ back[i] }, 2, 1) .. back[i].inversion .. back[i].octave,
+    names({ source[i] }, 2, 1) .. source[i].inversion .. source[i].octave,
+    "round trip pad " .. i
+  )
+end
+local moved = presets.render(captured, 4, 1) -- E major
+t.eq(moved[3].root, 4, "captured preset transposes: Imaj7 lands on E")
+t.eq(presets.capture_pad(pads_mod.empty(), 0, 1), false, "empty pad captures as false")
+local low = presets.capture_pad({ root = 0, type = 1, inversion = 2, octave = 3 }, 0, 1)
+t.eq(low and low.o, -1, "octave offset captured")
+t.eq(low and low.i, 2, "inversion captured")
 
 t.done()

@@ -60,6 +60,11 @@ t.eq(circle.diatonic_span(0, 7), 6, "C Locrian span starts at F#")
 local a0, a1 = circle.span_arc_deg(11)
 t.eq(a0, 315, "wedge start")
 t.eq(a1, 525, "wedge end covers seven positions")
+t.eq(circle.wedge_deg(0, 1), 330, "C Ionian wedge starts at F (330 degrees)")
+t.eq(circle.wedge_deg(0, 4), 0, "C Lydian wedge starts at C")
+local w0, w1 = circle.wedge_arc_deg(90)
+t.eq(w0, 75, "wedge arc start from a free angle")
+t.eq(w1, 285, "wedge arc end from a free angle")
 
 local outer, inner = circle.ring_chords(0, 1)
 t.eq(outer[1].numeral, "I", "C major is I")
@@ -73,5 +78,28 @@ t.eq(inner[3].numeral, "vii°", "B is the diminished degree")
 t.eq(theory.CHORD_TYPES[inner[3].type].id, "dim", "inner ring shows B dim")
 t.eq(inner[12].numeral, "ii", "D minor is ii")
 t.eq(inner[4].in_key, false, "F# minor out of key")
+t.eq(outer[11].flats, true, "Bb side of the circle spells flats in C")
+t.eq(outer[2].flats, false, "G side spells sharps in C")
+t.eq(outer[7].flats, false, "tritone from C spells F# (C prefers sharps)")
+local fo = circle.ring_chords(5, 1)
+t.eq(fo[6].flats, true, "tritone from F spells flats (F prefers flats)")
+t.eq(fo[12].flats, false, "the tonic itself is not flat-side")
+t.eq(fo[1].flats, false, "C is on the sharp side of F")
+local maj_t = assert(theory.type_index "maj")
+local min_t = assert(theory.type_index "min")
+local dim_t = assert(theory.type_index "dim")
+local r1, k1 = circle.ring_for_pad { root = 7, type = maj_t, inversion = 0, octave = 4 }
+t.eq(r1 .. k1, "outer1", "G major maps to the outer ring at G")
+local r2, k2 = circle.ring_for_pad { root = 9, type = min_t, inversion = 0, octave = 4 }
+t.eq(r2 .. k2, "inner0", "A minor maps to the inner ring under C")
+local r3, k3 = circle.ring_for_pad { root = 11, type = dim_t, inversion = 0, octave = 4 }
+t.eq(r3 .. k3, "inner2", "B dim maps to the inner ring under D")
+local r4, k4 = circle.ring_for_pad {
+  root = 0,
+  type = assert(theory.type_index "dom7"),
+  inversion = 0,
+  octave = 4,
+}
+t.eq(r4 .. k4, "outer0", "C7 maps to the outer ring at C")
 
 t.done()

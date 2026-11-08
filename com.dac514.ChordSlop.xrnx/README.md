@@ -27,18 +27,22 @@ centre button plays the tonic. Switch *Play* to *Assign to pad* and each chord
 you click lands on the selected pad, then the selection moves to the next pad,
 so you can lay out a progression in a few clicks.
 
-**Pads.** A 4x4 grid. Green pads are in the key, amber pads are borrowed from the
-parallel major or minor (or sit on a scale root with an outside note), grey pads
-are outside. Under each pad: its roman numeral and the computer key that plays
-it. Click a pad to select it and hear it.
+**Pads.** A 4x4 grid. Green pads hold chords of the key, grey pads anything
+else, exactly like the circle. Under each pad: its roman numeral (with a flat or
+sharp when the root is outside the scale) and the computer key that plays it.
+Click a pad to select it and hear it. While a pad sounds, its chord lights up on
+the circle, and while a circle chord sounds, every pad holding it lights up.
 
 **Pad editor.** Root, chord type, inversion and octave of the selected pad, and
 the exact notes it will play. *Clear* empties the pad.
 
-**Presets.** Factory presets are written as scale degrees, so they render into
-the current key (and switch the mode when they need one, like the minor and
-Dorian sets). Save the current pads under a name of your own; those are stored
-as written and survive restarts. *Delete* removes the selected preset of yours.
+**Presets.** Two dozen factory presets, from diatonic palettes and pop loops to
+jazz turnarounds, blues, modal vamps, power chords and film-score colour. They are
+written as scale degrees, so they render into the current key, and some switch the
+mode (minor, Dorian, Phrygian, Lydian, Mixolydian sets). Picking one from the list puts
+it on the pads; hover the list for a one-line description. *Save* stores the current pads under a name of your own,
+also relative to the key, so your presets transpose like the factory ones.
+*Delete* removes the selected preset of yours.
 
 **MIDI.** Pick an input device. Pads 1 to 16 answer to sixteen chromatic notes
 starting at the *Pad 1* note (C-3, MIDI note 36, by default: pad 1 of an AKAI
@@ -50,8 +54,8 @@ instrument's velocity column is in use.
 pads: `z s x d c v g b h n j m` for pads 1 to 12 and `q 2 w 3` for 13 to 16.
 Untick *QWERTY pads* to let every key through to Renoise.
 
-**Animate.** Turns the circle smoothly when the key changes. Untick it for an
-instant jump.
+**Animate.** Turns the circle smoothly when the key changes and sweeps the
+in-key wedge when the mode changes. Untick it for an instant jump.
 
 ## Recording
 

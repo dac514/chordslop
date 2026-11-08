@@ -3,9 +3,9 @@
   builder (so the dev bridge can map ids to views), the root view and a
   controller table that `src/app.lua` drives from MIDI and key events.
 
-  Layout (about 880 x 560):
-    header   title | key, mode, transpose pads
-    body     circle of fifths panel      | 4x4 pad grid + pad editor
+  Layout (about 960 x 520):
+    header   key, mode, transpose pads | presets
+    body     circle of fifths panel    | 4x4 pad grid + pad editor
     footer   MIDI device, pad 1 note, learn | QWERTY, animate | status
 ]]
 
@@ -53,6 +53,15 @@ local HELD_OUTER, HELD_INNER, HELD_CENTER = 100, 200, 300
 ---Key popup labels: both spellings so every key reads naturally.
 local KEY_ITEMS =
   { "C", "C# / Db", "D", "D# / Eb", "E", "F", "F# / Gb", "G", "G# / Ab", "A", "A# / Bb", "B" }
+
+local TIP_KEY = "Key: the root note everything is measured from. "
+  .. "Changing it turns the circle and, with Transpose pads on, moves every pad along."
+local TIP_MODE = "Mode: the scale built on the key (major, minor, Dorian...). "
+  .. "It decides which chords count as in key (green), how the circle is shaded and how presets are spelled."
+local TIP_PRESET_BASE = "Presets are ready-made layouts of 16 chords; pick one and it lands on the pads. "
+  .. "Factory presets are written as scale degrees and render into the current key; so do the ones you save."
+local TIP_MIDI_BASE = "The MIDI note that plays pad 1; pads 2-16 answer to the next 15 notes up. "
+  .. "Default C-3 (note 36) is pad 1 of bank A on an AKAI MPK mini. Or press Learn and hit a pad."
 
 ---@return string[]
 local function mode_items()
@@ -104,30 +113,10 @@ local function parse_note(text)
   return nil
 end
 
----Pads for a first run: the diatonic triads (1-7) and sevenths (9-15) of the key.
----@param key integer
----@param mode integer
----@return Pad[]
-local function default_pads(key, mode)
-  local pads = {}
-  for i = 1, pads_mod.COUNT do
-    pads[i] = pads_mod.empty()
-  end
-  for degree = 1, 7 do
-    local root, triad = theory.diatonic_chord(key, mode, degree, false)
-    pads[degree] = { root = root, type = triad, inversion = 0, octave = pads_mod.DEFAULT_OCTAVE }
-    local _, seventh = theory.diatonic_chord(key, mode, degree, true)
-    pads[degree + 8] =
-      { root = root, type = seventh, inversion = 0, octave = pads_mod.DEFAULT_OCTAVE }
-  end
-  return pads
-end
-
 ---Short chord label for a ring button ("Bb", "F#m", "B°").
 ---@param chord RingChord
----@param flats boolean
 ---@return string
-local function ring_label(chord, flats)
+local function ring_label(chord)
   local id = theory.CHORD_TYPES[chord.type].id
   local suffix = ""
   if id == "min" then
@@ -135,7 +124,7 @@ local function ring_label(chord, flats)
   elseif id == "dim" then
     suffix = "°"
   end
-  return theory.note_name(chord.root, flats) .. suffix
+  return theory.note_name(chord.root, chord.flats) .. suffix
 end
 
 ---@param app table The application module (`src/app.lua`).
@@ -154,11 +143,37 @@ function M.build(app, palette)
     circle_mode = 1,
   }
   if pads_mod.all_empty(ctl.pads) then
-    ctl.pads = default_pads(ctl.key, ctl.mode)
+    ctl.pads = presets.render(presets.FACTORY[1], ctl.key, ctl.mode)
     store.save_pads(prefs, ctl.pads)
   end
   ---@type table<integer, boolean> pads currently sounding
   local active = {}
+  ---@type table<string, boolean> ring buttons currently sounding, by "ring_k"
+  local ring_active = {}
+  ---@type fun(k: integer, ring: "outer"|"inner")
+  local refresh_ring
+
+  ---@param pad Pad
+  ---@return string? key ("outer_3") of the ring button holding the pad chord
+  local function ring_key_of(pad)
+    if pads_mod.is_empty(pad) then
+      return nil
+    end
+    local ring, k = circle.ring_for_pad(pad)
+    return ("%s_%d"):format(ring, k)
+  end
+
+  ---Is a ring button lit because a pad holding its chord is pressed?
+  ---@param ring_key string
+  ---@return boolean
+  local function ring_lit_by_pads(ring_key)
+    for i, pad in ipairs(ctl.pads) do
+      if active[i] and ring_key_of(pad) == ring_key then
+        return true
+      end
+    end
+    return false
+  end
   local syncing = false -- true while the code (not the user) sets control values
   ---@type fun()
   local refresh_circle
@@ -176,7 +191,8 @@ function M.build(app, palette)
     local button = vb.views["pad_" .. i] --[[@as renoise.Views.Button]]
     local label = vb.views["num_" .. i] --[[@as renoise.Views.Text]]
     local color = colors.for_function(palette, func)
-    if active[i] or i == ctl.selected then
+    local lit_by_ring = ring_active[ring_key_of(pad) or ""]
+    if active[i] or i == ctl.selected or lit_by_ring then
       color = palette.highlight(color)
     end
     button.text = name
@@ -271,16 +287,28 @@ function M.build(app, palette)
     refresh_editor()
   end
 
+  ---Redraw the ring button that holds the chord of pad `i`, once the circle exists.
+  ---@param i integer
+  local function refresh_ring_for_pad(i)
+    local pad = ctl.pads[i]
+    if refresh_ring and not pads_mod.is_empty(pad) then
+      local ring, k = circle.ring_for_pad(pad)
+      refresh_ring(k, ring)
+    end
+  end
+
   function ctl.press(i, velocity, from_midi)
     player.press(i, ctl.pads[i], velocity, from_midi)
     active[i] = true
     refresh_pad(i)
+    refresh_ring_for_pad(i)
   end
 
   function ctl.release(i)
     player.release(i)
     active[i] = nil
     refresh_pad(i)
+    refresh_ring_for_pad(i)
   end
 
   ---@param update fun(pad: Pad)
@@ -296,6 +324,15 @@ function M.build(app, palette)
   end
 
   -- Key and mode ---------------------------------------------------------------
+
+  ---Turn the circle (labels and wedge) to the current key and mode.
+  local function animate_circle()
+    anim.go(
+      circle.target_rotation(ctl.key),
+      circle.wedge_deg(ctl.key, ctl.mode),
+      prefs.animate.value
+    )
+  end
 
   ---@param new_key integer 0-11
   local function set_key(new_key)
@@ -315,17 +352,25 @@ function M.build(app, palette)
     ctl.key = new_key
     prefs.root_key.value = new_key
     ctl.refresh_all()
-    anim.rotate_to(circle.target_rotation(new_key), prefs.animate.value)
+    animate_circle()
   end
 
   ---@param new_mode integer 1-7
-  local function set_mode(new_mode)
+  ---@param refresh boolean? Refresh and animate right away (default true).
+  local function set_mode(new_mode, refresh)
     if new_mode == ctl.mode then
       return
     end
     ctl.mode = new_mode
     prefs.mode.value = new_mode
-    ctl.refresh_all()
+    syncing = true
+    local popup = vb.views.mode --[[@as renoise.Views.Popup]]
+    popup.value = new_mode
+    syncing = false
+    if refresh ~= false then
+      ctl.refresh_all()
+      animate_circle()
+    end
   end
 
   -- MIDI -----------------------------------------------------------------------
@@ -391,6 +436,20 @@ function M.build(app, palette)
     return nil
   end
 
+  ---The preset behind a popup index, if any.
+  ---@param index integer
+  ---@return Preset?
+  local function preset_at(index)
+    if index >= 1 and index <= factory_count then
+      return presets.FACTORY[index]
+    end
+    local u = user_index(index)
+    if u then
+      return store.load_user_preset(prefs, u)
+    end
+    return nil
+  end
+
   ---@param select integer? Popup index to select afterwards.
   local function refresh_presets(select)
     local popup = vb.views.preset --[[@as renoise.Views.Popup]]
@@ -401,38 +460,38 @@ function M.build(app, palette)
       popup.value = select
     end
     syncing = false
+    local preset = preset_at(popup.value)
+    local tip = TIP_PRESET_BASE
+    if preset then
+      tip = ("%s\n\n%s%s"):format(
+        preset.name,
+        preset.desc or "Your own preset.",
+        "\n\n" .. TIP_PRESET_BASE
+      )
+      if preset.mode then
+        tip = tip
+          .. ("\nWritten in %s; loading switches the mode."):format(theory.MODES[preset.mode].name)
+      end
+    end
+    popup.tooltip = tip
     local del = vb.views.preset_delete --[[@as renoise.Views.Button]]
     del.active = user_index(popup.value) ~= nil
   end
 
-  ---@param pads Pad[]
-  local function replace_pads(pads)
-    ctl.pads = pads
+  function ctl.load_preset(index)
+    local preset = preset_at(index)
+    if not preset then
+      return
+    end
+    if preset.mode and preset.mode ~= ctl.mode then
+      set_mode(preset.mode, false)
+    end
+    ctl.pads = presets.render(preset, ctl.key, ctl.mode)
     save_pads()
     ctl.selected = 1
     ctl.refresh_all()
-  end
-
-  function ctl.load_preset(index)
-    if index <= factory_count then
-      local preset = presets.FACTORY[index]
-      if preset.mode and preset.mode ~= ctl.mode then
-        ctl.mode = preset.mode
-        prefs.mode.value = preset.mode
-        syncing = true
-        local mode_popup = vb.views.mode --[[@as renoise.Views.Popup]]
-        mode_popup.value = preset.mode
-        syncing = false
-      end
-      replace_pads(presets.render(preset, ctl.key, ctl.mode))
-      renoise.app():show_status(("ChordSlop: loaded %s"):format(preset.name))
-      return
-    end
-    local u = user_index(index)
-    if u then
-      replace_pads(store.load_user_preset(prefs, u))
-      renoise.app():show_status(("ChordSlop: loaded %s"):format(store.user_preset_names(prefs)[u]))
-    end
+    animate_circle()
+    renoise.app():show_status(("ChordSlop: %s. %s"):format(preset.name, preset.desc or ""))
   end
 
   function ctl.save_preset(name)
@@ -440,9 +499,15 @@ function M.build(app, palette)
     if name == "" then
       name = ("Preset %d"):format(#store.user_preset_names(prefs) + 1)
     end
-    local u = store.save_user_preset(prefs, name, ctl.pads)
+    local u = store.save_user_preset(prefs, presets.capture(ctl.pads, ctl.key, ctl.mode, name))
     refresh_presets(factory_count + 1 + u)
-    renoise.app():show_status(("ChordSlop: saved %s"):format(name))
+    renoise.app():show_status(
+      ("ChordSlop: saved %s (relative to %s %s)"):format(
+        name,
+        theory.note_name(ctl.key, flats()),
+        theory.MODES[ctl.mode].short
+      )
+    )
   end
 
   function ctl.delete_preset(index)
@@ -458,12 +523,12 @@ function M.build(app, palette)
 
   local layout = circle.layout(CIRCLE_SIZE)
   local rotation = circle.target_rotation(ctl.key)
+  local wedge = circle.wedge_deg(ctl.key, ctl.mode)
   local ring_outer, ring_inner = circle.ring_chords(ctl.key, ctl.mode)
 
   ---@param ctx renoise.Views.Canvas.Context
   local function draw_wheel(ctx)
     local L = layout
-    local k_start = circle.diatonic_span(ctl.key, ctl.mode)
     ctx:translate(L.cx, L.cy)
     ctx:rotate(math.rad(rotation))
     -- disc
@@ -472,7 +537,7 @@ function M.build(app, palette)
     ctx:arc(0, 0, L.r_edge, 0, 2 * math.pi)
     ctx:fill()
     -- in-key wedge
-    local a0, a1 = circle.span_arc_deg(k_start)
+    local a0, a1 = circle.wedge_arc_deg(wedge)
     local c = palette.in_key
     ctx.fill_color = { c[1], c[2], c[3], 96 }
     ctx:begin_path()
@@ -520,6 +585,16 @@ function M.build(app, palette)
       chord
   end
 
+  ---Redraw every pad whose chord sits on this ring button.
+  ---@param ring_key string
+  local function refresh_pads_on_ring(ring_key)
+    for i, pad in ipairs(ctl.pads) do
+      if ring_key_of(pad) == ring_key then
+        refresh_pad(i)
+      end
+    end
+  end
+
   ---@param k integer
   ---@param ring "outer"|"inner"
   local function ring_pressed(k, ring)
@@ -530,6 +605,10 @@ function M.build(app, palette)
       refresh_pad(ctl.selected)
       refresh_editor()
     end
+    local ring_key = ("%s_%d"):format(ring, k)
+    ring_active[ring_key] = true
+    refresh_ring(k, ring)
+    refresh_pads_on_ring(ring_key)
     player.press((ring == "outer" and HELD_OUTER or HELD_INNER) + k, pad, nil, false)
   end
 
@@ -537,6 +616,10 @@ function M.build(app, palette)
   ---@param ring "outer"|"inner"
   local function ring_released(k, ring)
     player.release((ring == "outer" and HELD_OUTER or HELD_INNER) + k)
+    local ring_key = ("%s_%d"):format(ring, k)
+    ring_active[ring_key] = nil
+    refresh_ring(k, ring)
+    refresh_pads_on_ring(ring_key)
     if ctl.circle_mode == 2 then
       select_pad(ctl.selected % pads_mod.COUNT + 1)
     end
@@ -549,8 +632,10 @@ function M.build(app, palette)
   end
 
   ---@param rot number
-  local function apply_rotation(rot)
+  ---@param wedge_deg number
+  local function apply_angles(rot, wedge_deg)
     rotation = rot
+    wedge = wedge_deg
     for k = 0, circle.POSITIONS - 1 do
       for _, ring in ipairs { "outer", "inner" } do
         local button = vb.views[("ring_%s_%d"):format(ring, k)] --[[@as renoise.Views.Button]]
@@ -561,18 +646,25 @@ function M.build(app, palette)
     canvas:update()
   end
 
+  function refresh_ring(k, ring)
+    local chord = (ring == "outer") and ring_outer[k + 1] or ring_inner[k + 1]
+    local button = vb.views[("ring_%s_%d"):format(ring, k)] --[[@as renoise.Views.Button]]
+    local ring_key = ("%s_%d"):format(ring, k)
+    local color = chord.in_key and palette.in_key or { 0, 0, 0 }
+    if ring_active[ring_key] or ring_lit_by_pads(ring_key) then
+      color = palette.highlight(color)
+    end
+    button.text = ring_label(chord)
+    button.color = color
+    button.tooltip = chord.numeral and ("%s in this key"):format(chord.numeral) or "Outside the key"
+  end
+
   function refresh_circle()
     ring_outer, ring_inner = circle.ring_chords(ctl.key, ctl.mode)
     local use_flats = flats()
     for k = 0, circle.POSITIONS - 1 do
-      for _, ring in ipairs { "outer", "inner" } do
-        local chord = (ring == "outer") and ring_outer[k + 1] or ring_inner[k + 1]
-        local button = vb.views[("ring_%s_%d"):format(ring, k)] --[[@as renoise.Views.Button]]
-        button.text = ring_label(chord, use_flats)
-        button.color = chord.in_key and palette.in_key or { 0, 0, 0 }
-        button.tooltip = chord.numeral and ("%s in this key"):format(chord.numeral)
-          or "Outside the key"
-      end
+      refresh_ring(k, "outer")
+      refresh_ring(k, "inner")
     end
     local center = vb.views.center --[[@as renoise.Views.Button]]
     center.text = ("%s %s"):format(
@@ -655,6 +747,7 @@ function M.build(app, palette)
           id = "num_" .. i,
           size = { width = PAD_W - 28, height = LABEL_H },
           align = "left",
+          tooltip = "Roman numeral of this chord in the current key",
         },
         vb:text {
           id = "keycap_" .. i,
@@ -663,6 +756,7 @@ function M.build(app, palette)
           style = "disabled",
           font = "mono",
           text = input.PAD_KEYS[i],
+          tooltip = "Computer key that plays this pad while the window has focus",
         },
       },
     }
@@ -682,12 +776,13 @@ function M.build(app, palette)
     mode = "justify",
     vb:row {
       spacing = SPACING,
-      vb:text { text = "Key", style = "disabled" },
+      vb:text { text = "Key", style = "disabled", tooltip = TIP_KEY },
       vb:popup {
         id = "key",
         width = 80,
         items = KEY_ITEMS,
         value = ctl.key + 1,
+        tooltip = TIP_KEY,
         notifier = app.guard(function(value)
           if not syncing then
             set_key(value - 1)
@@ -699,6 +794,7 @@ function M.build(app, palette)
         width = 124,
         items = mode_items(),
         value = ctl.mode,
+        tooltip = TIP_MODE,
         notifier = app.guard(function(value)
           if not syncing then
             set_mode(value)
@@ -709,40 +805,34 @@ function M.build(app, palette)
       vb:checkbox { id = "transpose", bind = prefs.transpose_pads },
       vb:text {
         text = "Transpose pads with key",
-        tooltip = "Changing the key moves every pad with it",
+        tooltip = "On: changing the key moves every pad with it. Off: the pads stay and only their numerals and colours follow the key.",
       },
     },
     vb:row {
       spacing = SPACING,
-      vb:text { text = "Preset", style = "disabled" },
+      vb:text { text = "Preset", style = "disabled", tooltip = TIP_PRESET_BASE },
       vb:popup {
         id = "preset",
-        width = 180,
+        width = 200,
         items = preset_items(),
-        tooltip = "Factory presets follow the key and mode; your own presets are stored as written",
-        notifier = app.guard(function()
+        tooltip = TIP_PRESET_BASE,
+        notifier = app.guard(function(value)
           if not syncing then
             refresh_presets()
+            ctl.load_preset(value)
           end
-        end),
-      },
-      vb:button {
-        id = "preset_load",
-        text = "Load",
-        notifier = app.guard(function()
-          local popup = vb.views.preset --[[@as renoise.Views.Popup]]
-          ctl.load_preset(popup.value)
         end),
       },
       vb:space { width = GAP },
       vb:textfield {
         id = "preset_name",
         width = 120,
-        tooltip = "Name for saving the current pads as a preset",
+        tooltip = "Name for saving the current pads as your own preset",
       },
       vb:button {
         id = "preset_save",
         text = "Save",
+        tooltip = "Save the current pads as a preset of yours. It is stored relative to the key, so it follows key changes like the factory ones.",
         notifier = app.guard(function()
           local field = vb.views.preset_name --[[@as renoise.Views.TextField]]
           ctl.save_preset(field.value)
@@ -751,6 +841,7 @@ function M.build(app, palette)
       vb:button {
         id = "preset_delete",
         text = "Delete",
+        tooltip = "Delete the chosen preset of yours (factory presets cannot be deleted)",
         notifier = app.guard(function()
           local popup = vb.views.preset --[[@as renoise.Views.Popup]]
           ctl.delete_preset(popup.value)
@@ -772,12 +863,17 @@ function M.build(app, palette)
         width = 190,
         items = { "Play", "Assign to pad" },
         value = ctl.circle_mode,
-        tooltip = "Assign: clicking a chord puts it on the selected pad and moves to the next one",
+        tooltip = "Play: clicking a chord on the circle just plays it. Assign: it also lands on the selected pad, then the selection moves to the next pad.",
         notifier = app.guard(function(value)
           ctl.circle_mode = value
         end),
       },
-      vb:text { id = "key_label", style = "disabled", font = "mono" },
+      vb:text {
+        id = "key_label",
+        style = "disabled",
+        font = "mono",
+        tooltip = "The notes of the current key and mode",
+      },
     },
   }
 
@@ -787,7 +883,7 @@ function M.build(app, palette)
     style = "group",
     margin = GAP,
     size = { width = GRID_W, height = LABEL_H + 2 * GAP },
-    vb:text { id = "editor_title", font = "bold", width = 44 },
+    vb:text { id = "editor_title", font = "bold", width = 44, tooltip = "The selected pad" },
     vb:row {
       spacing = SPACING,
       vb:text { text = "Root", style = "disabled" },
@@ -795,6 +891,7 @@ function M.build(app, palette)
         id = "pad_root",
         width = 80,
         items = KEY_ITEMS,
+        tooltip = "Root note of the selected pad's chord",
         notifier = app.guard(function(value)
           edit_selected(function(pad)
             pad.root = value - 1
@@ -812,6 +909,7 @@ function M.build(app, palette)
         id = "pad_type",
         width = 76,
         items = type_items(),
+        tooltip = "Chord type of the selected pad",
         notifier = app.guard(function(value)
           edit_selected(function(pad)
             pad.type = value - 1
@@ -827,6 +925,7 @@ function M.build(app, palette)
         width = 50,
         min = 0,
         max = pads_mod.MAX_INVERSION,
+        tooltip = "Inversion: how many of the lowest chord tones move up an octave",
         notifier = app.guard(function(value)
           edit_selected(function(pad)
             pad.inversion = value
@@ -842,6 +941,7 @@ function M.build(app, palette)
         width = 50,
         min = pads_mod.MIN_OCTAVE,
         max = pads_mod.MAX_OCTAVE,
+        tooltip = "Octave of the chord root (4 = C-4 territory)",
         notifier = app.guard(function(value)
           edit_selected(function(pad)
             pad.octave = value
@@ -852,6 +952,7 @@ function M.build(app, palette)
     vb:button {
       id = "pad_clear",
       text = "Clear",
+      tooltip = "Empty the selected pad",
       notifier = app.guard(function()
         edit_selected(function(pad)
           pad.type = 0
@@ -865,7 +966,12 @@ function M.build(app, palette)
     spacing = GAP,
     grid,
     editor,
-    vb:text { id = "editor_notes", style = "disabled", font = "mono" },
+    vb:text {
+      id = "editor_notes",
+      style = "disabled",
+      font = "mono",
+      tooltip = "The notes the selected pad plays, lowest first",
+    },
   }
 
   local footer = vb:horizontal_aligner {
@@ -873,11 +979,16 @@ function M.build(app, palette)
     mode = "justify",
     vb:row {
       spacing = SPACING,
-      vb:text { text = "MIDI", style = "disabled" },
+      vb:text {
+        text = "MIDI",
+        style = "disabled",
+        tooltip = "MIDI input device for triggering pads",
+      },
       vb:popup {
         id = "midi_device",
         width = 190,
         items = midi_items(),
+        tooltip = "MIDI input device whose notes trigger the pads",
         notifier = app.guard(function(value)
           if syncing then
             return
@@ -888,7 +999,7 @@ function M.build(app, palette)
           app.set_midi_device(name)
         end),
       },
-      vb:text { text = "Pad 1", style = "disabled" },
+      vb:text { text = "Pad 1 note", style = "disabled", tooltip = TIP_MIDI_BASE },
       vb:valuebox {
         id = "midi_base",
         width = 64,
@@ -897,7 +1008,7 @@ function M.build(app, palette)
         bind = prefs.midi_base_note,
         tostring = note_label,
         tonumber = parse_note,
-        tooltip = "MIDI note of pad 1; pads 2-16 follow chromatically (MPK mini: C-3 = pad 1, bank A)",
+        tooltip = TIP_MIDI_BASE,
         notifier = app.guard(function()
           refresh_pads()
         end),
@@ -905,7 +1016,7 @@ function M.build(app, palette)
       vb:button {
         id = "learn",
         text = "Learn",
-        tooltip = "Then hit the controller pad you want as pad 1",
+        tooltip = "Press, then hit the controller pad you want as pad 1; the other pads follow chromatically",
         notifier = app.guard(function()
           ctl.learn_armed = not ctl.learn_armed
           refresh_learn()
@@ -919,9 +1030,9 @@ function M.build(app, palette)
       },
       vb:space { width = GAP },
       vb:checkbox { id = "animate", bind = prefs.animate },
-      vb:text { text = "Animate", tooltip = "Turn the circle when the key changes" },
+      vb:text { text = "Animate", tooltip = "Turn the circle smoothly when the key or mode changes" },
     },
-    vb:text { id = "status", style = "disabled" },
+    vb:text { id = "status", style = "disabled", tooltip = "What a pad press will do right now" },
   }
 
   local root = vb:column {
@@ -957,7 +1068,7 @@ function M.build(app, palette)
   refresh_learn()
   refresh_presets(1)
   ctl.refresh_all()
-  anim.init(app, app.guard(apply_rotation), rotation)
+  anim.init(app, app.guard(apply_angles), rotation, wedge)
   return vb, root, ctl --[[@as UiController]]
 end
 

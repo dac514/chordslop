@@ -139,8 +139,9 @@ function M.label(pad, key, mode)
   if M.is_empty(pad) then
     return "", "", "empty"
   end
-  local flats = theory.prefers_flats(key, mode)
   local analysis = theory.analyze(pad.root, pad.type, key, mode)
+  -- Flattened degrees (bVII, bIII...) read as flats whatever the key prefers.
+  local flats = theory.prefers_flats(key, mode) or analysis.numeral:sub(1, 1) == "b"
   return theory.chord_name(pad.root, pad.type, flats), analysis.numeral, analysis.func
 end
 

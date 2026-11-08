@@ -15,6 +15,7 @@ t.check(pal.in_key[2] > pal.in_key[1], "in_key is greenish")
 t.check(pal.borrowed[1] > pal.borrowed[3], "borrowed is warm")
 t.eq(list(colors.for_function(pal, "in_key")), list(pal.in_key), "for_function in_key")
 t.eq(list(colors.for_function(pal, "empty")), "0,0,0", "for_function empty")
+t.eq(list(colors.for_function(pal, "borrowed")), "0,0,0", "borrowed pads keep the theme colour")
 local hl = pal.highlight(pal.in_key)
 t.check(hl[1] > pal.in_key[1] and hl[3] > pal.in_key[3], "highlight brightens")
 local hl0 = pal.highlight { 0, 0, 0 }

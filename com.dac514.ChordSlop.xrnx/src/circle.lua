@@ -171,12 +171,40 @@ function M.diatonic_span(key, mode)
   return (M.position_of(key) - theory.MODES[mode].brightness) % 12
 end
 
+---Angle (degrees, circle space) of the first in-key position for a key/mode.
+---This is the value the wedge animation tweens.
+---@param key integer 0-11
+---@param mode integer 1-7
+---@return number degrees
+function M.wedge_deg(key, mode)
+  return M.diatonic_span(key, mode) * M.STEP_DEG
+end
+
+---Angles bounding a seven-position wedge that starts at `start_deg`.
+---@param start_deg number Angle of the first position, circle space.
+---@return number start_deg, number end_deg (clockwise from 12 o'clock)
+function M.wedge_arc_deg(start_deg)
+  return start_deg - M.STEP_DEG / 2, start_deg + 6 * M.STEP_DEG + M.STEP_DEG / 2
+end
+
 ---Angles bounding the in-key wedge, in unrotated circle space.
 ---@param k_start integer
 ---@return number start_deg, number end_deg (clockwise from 12 o'clock)
 function M.span_arc_deg(k_start)
-  return k_start * M.STEP_DEG - M.STEP_DEG / 2,
-    k_start * M.STEP_DEG + 6 * M.STEP_DEG + M.STEP_DEG / 2
+  return M.wedge_arc_deg(k_start * M.STEP_DEG)
+end
+
+---Which ring button a pad chord corresponds to: major-flavoured chords sit
+---on the outer ring at the root position, minor and diminished ones on the
+---inner ring where that root is the relative minor.
+---@param pad Pad
+---@return "outer"|"inner" ring, integer k
+function M.ring_for_pad(pad)
+  local third = theory.CHORD_TYPES[pad.type].intervals[2]
+  if third == 3 then
+    return "inner", M.position_of((pad.root + 3) % 12)
+  end
+  return "outer", M.position_of(pad.root)
 end
 
 ---@class RingChord
@@ -184,6 +212,7 @@ end
 ---@field type integer index into theory.CHORD_TYPES
 ---@field numeral string? Roman numeral when the chord is diatonic.
 ---@field in_key boolean
+---@field flats boolean Spell the root with a flat (the flat side of the circle from the tonic).
 
 ---The chord shown at each ring position for a key/mode: majors outside,
 ---relative minors inside. Diatonic chords carry their numeral; the diminished
@@ -201,15 +230,22 @@ function M.ring_chords(key, mode)
     diatonic[root] =
       { type = type_index, numeral = theory.analyze(root, type_index, key, mode).numeral }
   end
+  local tonic = M.position_of(key)
+  local key_flats = theory.prefers_flats(key, mode)
   local outer, inner = {}, {}
   for k = 0, M.POSITIONS - 1 do
     local opc, ipc = M.major_at(k), M.minor_at(k)
     local od, id = diatonic[opc], diatonic[ipc]
+    -- Positions 1-5 clockwise from the tonic are the sharp side, 7-11 the flat
+    -- side; the tritone follows the key's own preference.
+    local steps = (k - tonic) % M.POSITIONS
+    local flats = steps >= 7 or (steps == 6 and key_flats)
     outer[k + 1] = {
       root = opc,
       type = maj,
       numeral = (od and od.type == maj) and od.numeral or nil,
       in_key = od ~= nil and od.type == maj,
+      flats = flats,
     }
     local inner_type = min
     if id and id.type ~= maj then
@@ -220,6 +256,7 @@ function M.ring_chords(key, mode)
       type = inner_type,
       numeral = (id and id.type ~= maj) and id.numeral or nil,
       in_key = id ~= nil and id.type ~= maj,
+      flats = flats,
     }
   end
   return outer, inner

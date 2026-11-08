@@ -30,12 +30,15 @@ _AUTO_RELOAD_DEBUG = false
 -- The preset model must be registered before the preferences document exists:
 -- Renoise instantiates the items of `presets` from preferences.xml at that moment.
 if not renoise.tool().preferences then
+  -- A user preset, stored relative to a key (see src/presets.lua and src/store.lua).
   renoise.Document.create "ChordSlopPreset" {
     name = "",
-    roots = { 0 },
+    mode = 0,
+    degrees = { 0 },
+    accidentals = { 0 },
     types = { 0 },
     inversions = { 0 },
-    octaves = { 4 },
+    octaves = { 0 },
   }
 
   local function sixteen(value)

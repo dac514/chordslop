@@ -24,7 +24,7 @@ end
 
 ---@class PadPalette
 ---@field in_key RGB
----@field borrowed RGB
+---@field borrowed RGB Accent for armed states such as MIDI learn.
 ---@field out RGB `{0,0,0}` means "theme default" for a Renoise button
 ---@field highlight fun(color: RGB): RGB Brightened version for the selected pad
 
@@ -49,15 +49,14 @@ function M.palette(button_back)
   return palette
 end
 
----Colour for a pad function.
+---Colour for a pad function. Only in-key chords are coloured, so the pads
+---read the same way as the circle; everything else keeps the theme colour.
 ---@param palette PadPalette
 ---@param func "in_key"|"borrowed"|"out"|"empty"
 ---@return RGB
 function M.for_function(palette, func)
   if func == "in_key" then
     return palette.in_key
-  elseif func == "borrowed" then
-    return palette.borrowed
   end
   return palette.out
 end

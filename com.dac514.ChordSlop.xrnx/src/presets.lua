@@ -1,7 +1,8 @@
 --[[
-  Factory presets. Each preset is a 4x4 palette of chords written as scale
-  degrees, so it renders into any key and mode. Pure Lua; `src/store.lua`
-  handles the user's own (absolute) presets.
+  Presets: 4x4 chord palettes written as scale degrees, so they render into
+  any key and mode. Factory presets live here; the user's own are captured
+  from the pads in the same relative form (see `capture`) and stored by
+  `src/store.lua`. Pure Lua.
 
   A pad spec is a small table:
     d  scale degree 1-7 (required)
@@ -29,17 +30,19 @@ local M = {}
 
 ---@class Preset
 ---@field name string
+---@field desc string? One line about the sound or use.
 ---@field mode integer? Mode the preset is written for; loading it switches the mode.
 ---@field pads (PresetPad|false)[] Up to 16 entries, row by row.
 
 local MAJ = theory.MODE_IONIAN
 local MIN = theory.MODE_AEOLIAN
-local DOR = 2
+local DOR, PHR, LYD, MIX = 2, 3, 4, 5
 
 ---@type Preset[]
 M.FACTORY = {
   {
     name = "Diatonic: triads + sevenths",
+    desc = "Every chord of the key: triads on the first two rows, sevenths below. Works in any mode.",
     pads = {
       { d = 1 },
       { d = 2 },
@@ -61,6 +64,7 @@ M.FACTORY = {
   },
   {
     name = "Pop: I V vi IV",
+    desc = "The four-chord loop in both orders, then sevenths and colour chords.",
     mode = MAJ,
     pads = {
       { d = 1 },
@@ -83,6 +87,7 @@ M.FACTORY = {
   },
   {
     name = "50s: I vi IV V",
+    desc = "Doo-wop and ballad changes, with the ii substitute and sixth chords.",
     mode = MAJ,
     pads = {
       { d = 1 },
@@ -104,7 +109,31 @@ M.FACTORY = {
     },
   },
   {
+    name = "Canon: I V vi iii IV",
+    desc = "The Pachelbel progression, root position on top, inversions below for smooth bass.",
+    mode = MAJ,
+    pads = {
+      { d = 1 },
+      { d = 5 },
+      { d = 6 },
+      { d = 3 },
+      { d = 4 },
+      { d = 1 },
+      { d = 4 },
+      { d = 5 },
+      { d = 1, i = 1 },
+      { d = 5, i = 1 },
+      { d = 6, i = 1 },
+      { d = 3, i = 1 },
+      { d = 4, i = 1 },
+      { d = 1, i = 2 },
+      { d = 4, i = 2 },
+      { d = 5, i = 2 },
+    },
+  },
+  {
     name = "Jazz: ii V I",
+    desc = "Turnarounds, secondary dominants, the half-diminished iv and a tritone sub.",
     mode = MAJ,
     pads = {
       { d = 2, s = true },
@@ -126,7 +155,31 @@ M.FACTORY = {
     },
   },
   {
+    name = "Bossa / latin",
+    desc = "Major sevenths, minor sevenths and dominants that lean into each other.",
+    mode = MAJ,
+    pads = {
+      { d = 1, s = true },
+      { d = 2, s = true },
+      { d = 5, s = true },
+      { d = 1, t = "6" },
+      { d = 6, s = true },
+      { d = 2, t = "dom7" },
+      { d = 2, s = true },
+      { d = 5, t = "dom7", i = 1 },
+      { d = 3, s = true },
+      { d = 6, t = "dom7" },
+      { d = 2, s = true, i = 1 },
+      { d = 5, s = true, i = 1 },
+      { d = 4, s = true },
+      { d = 4, a = 1, t = "m7b5" },
+      { d = 7, t = "m7b5" },
+      { d = 2, a = -1, t = "dom7" },
+    },
+  },
+  {
     name = "Blues: 12 bars",
+    desc = "Dominant sevenths laid out bar by bar, read left to right, plus turnaround colours.",
     mode = MAJ,
     pads = {
       { d = 1, t = "dom7" },
@@ -148,73 +201,31 @@ M.FACTORY = {
     },
   },
   {
-    name = "Minor: i iv v VI",
-    mode = MIN,
+    name = "Gospel / R&B",
+    desc = "Lush sevenths with borrowed flat chords and a suspended dominant.",
+    mode = MAJ,
     pads = {
-      { d = 1 },
-      { d = 4 },
-      { d = 5 },
-      { d = 6 },
-      { d = 7 },
-      { d = 3 },
-      { d = 2 },
-      { d = 5, t = "maj" },
       { d = 1, s = true },
-      { d = 4, s = true },
-      { d = 5, t = "dom7" },
-      { d = 6, s = true },
-      { d = 7, s = true },
       { d = 3, s = true },
-      { d = 2, s = true },
-      { d = 1, t = "mmaj7" },
-    },
-  },
-  {
-    name = "Andalusian: i VII VI V",
-    mode = MIN,
-    pads = {
-      { d = 1 },
-      { d = 7 },
-      { d = 6 },
-      { d = 5, t = "maj" },
-      { d = 1, s = true },
-      { d = 7, s = true },
       { d = 6, s = true },
-      { d = 5, t = "dom7" },
-      { d = 4 },
-      { d = 3 },
-      { d = 7 },
-      { d = 5, t = "sus4" },
-      { d = 1, i = 1 },
-      { d = 7, i = 1 },
-      { d = 6, i = 1 },
-      { d = 5, t = "maj", i = 1 },
-    },
-  },
-  {
-    name = "Dorian vamp",
-    mode = DOR,
-    pads = {
-      { d = 1, s = true },
-      { d = 4, t = "dom7" },
-      { d = 1, s = true },
       { d = 2, s = true },
-      { d = 1 },
-      { d = 4 },
-      { d = 2 },
-      { d = 7 },
-      { d = 1, t = "m6" },
+      { d = 5, t = "dom7" },
+      { d = 1, t = "6" },
       { d = 4, t = "6" },
-      { d = 7, s = true },
-      { d = 3, s = true },
-      { d = 1, s = true, i = 1 },
-      { d = 4, t = "dom7", i = 1 },
+      { d = 5, t = "sus4" },
+      { d = 7, a = -1, t = "maj7" },
+      { d = 3, a = -1, t = "maj7" },
+      { d = 6, a = -1, t = "maj7" },
+      { d = 5, t = "dom7", i = 1 },
       { d = 2, s = true, i = 1 },
-      { d = 1, t = "sus4" },
+      { d = 5, t = "dom7", i = 2 },
+      { d = 1, s = true, i = 2 },
+      { d = 6, s = true, i = 1 },
     },
   },
   {
     name = "Neo-soul sevenths",
+    desc = "Mellow major-key sevenths with inversions and a couple of borrowed maj7s.",
     mode = MAJ,
     pads = {
       { d = 1, s = true },
@@ -236,7 +247,284 @@ M.FACTORY = {
     },
   },
   {
+    name = "Lo-fi hip hop",
+    desc = "Minor sevenths and major sevenths that loop forever; try the inversions on the last row.",
+    mode = MAJ,
+    pads = {
+      { d = 2, s = true },
+      { d = 5, s = true },
+      { d = 1, s = true },
+      { d = 6, s = true },
+      { d = 3, s = true },
+      { d = 6, s = true },
+      { d = 2, s = true },
+      { d = 5, t = "dom7" },
+      { d = 4, s = true },
+      { d = 3, s = true },
+      { d = 2, s = true },
+      { d = 1, s = true },
+      { d = 1, t = "6" },
+      { d = 4, s = true, i = 1 },
+      { d = 3, s = true, i = 1 },
+      { d = 6, s = true, i = 1 },
+    },
+  },
+  {
+    name = "Modal interchange",
+    desc = "Major key with chords borrowed from the parallel minor: iv, bIII, bVI, bVII.",
+    mode = MAJ,
+    pads = {
+      { d = 1 },
+      { d = 4, t = "min" },
+      { d = 6, a = -1 },
+      { d = 7, a = -1 },
+      { d = 1 },
+      { d = 3, a = -1 },
+      { d = 4 },
+      { d = 4, t = "min" },
+      { d = 1, s = true },
+      { d = 4, t = "min7" },
+      { d = 6, a = -1, t = "maj7" },
+      { d = 7, a = -1, t = "dom7" },
+      { d = 2, s = true },
+      { d = 2, a = -1, t = "maj7" },
+      { d = 5, t = "dom7" },
+      { d = 1, t = "6" },
+    },
+  },
+  {
+    name = "Chromatic mediants",
+    desc = "Film-score colour: major chords a third apart that share one note.",
+    mode = MAJ,
+    pads = {
+      { d = 1 },
+      { d = 3, t = "maj" },
+      { d = 3, a = -1 },
+      { d = 1 },
+      { d = 1 },
+      { d = 6, t = "maj" },
+      { d = 6, a = -1 },
+      { d = 1 },
+      { d = 1, t = "min" },
+      { d = 3, a = -1, t = "min" },
+      { d = 6, t = "min" },
+      { d = 1, t = "min" },
+      { d = 1, o = -1 },
+      { d = 3, t = "maj", o = -1 },
+      { d = 6, a = -1, o = -1 },
+      { d = 1, t = "aug" },
+    },
+  },
+  {
+    name = "Minor: i iv v VI",
+    desc = "Natural minor with the harmonic-minor V and V7 for the pull back home.",
+    mode = MIN,
+    pads = {
+      { d = 1 },
+      { d = 4 },
+      { d = 5 },
+      { d = 6 },
+      { d = 7 },
+      { d = 3 },
+      { d = 2 },
+      { d = 5, t = "maj" },
+      { d = 1, s = true },
+      { d = 4, s = true },
+      { d = 5, t = "dom7" },
+      { d = 6, s = true },
+      { d = 7, s = true },
+      { d = 3, s = true },
+      { d = 2, s = true },
+      { d = 1, t = "mmaj7" },
+    },
+  },
+  {
+    name = "Sad minor ballad",
+    desc = "i VI III VII and friends; slow, open, with sevenths on the lower rows.",
+    mode = MIN,
+    pads = {
+      { d = 1 },
+      { d = 6 },
+      { d = 3 },
+      { d = 7 },
+      { d = 4 },
+      { d = 1 },
+      { d = 5, t = "dom7" },
+      { d = 1 },
+      { d = 1, s = true },
+      { d = 6, s = true },
+      { d = 3, s = true },
+      { d = 7, s = true },
+      { d = 4, s = true },
+      { d = 1, i = 1 },
+      { d = 5, t = "maj" },
+      { d = 6, i = 1 },
+    },
+  },
+  {
+    name = "Andalusian: i VII VI V",
+    desc = "The flamenco descent, with sevenths, a sus4 dominant and first inversions.",
+    mode = MIN,
+    pads = {
+      { d = 1 },
+      { d = 7 },
+      { d = 6 },
+      { d = 5, t = "maj" },
+      { d = 1, s = true },
+      { d = 7, s = true },
+      { d = 6, s = true },
+      { d = 5, t = "dom7" },
+      { d = 4 },
+      { d = 3 },
+      { d = 7 },
+      { d = 5, t = "sus4" },
+      { d = 1, i = 1 },
+      { d = 7, i = 1 },
+      { d = 6, i = 1 },
+      { d = 5, t = "maj", i = 1 },
+    },
+  },
+  {
+    name = "Trance / EDM minor",
+    desc = "Big minor loops: i VI III VII, the low octave for basslines, add9s for width.",
+    mode = MIN,
+    pads = {
+      { d = 1 },
+      { d = 6 },
+      { d = 3 },
+      { d = 7 },
+      { d = 1 },
+      { d = 7 },
+      { d = 6 },
+      { d = 7 },
+      { d = 1, o = -1 },
+      { d = 6, o = -1 },
+      { d = 3, o = -1 },
+      { d = 7, o = -1 },
+      { d = 1, t = "sus2" },
+      { d = 6, t = "add9" },
+      { d = 3, t = "add9" },
+      { d = 7, t = "sus4" },
+    },
+  },
+  {
+    name = "Cinematic minor",
+    desc = "Epic and dark: open fifths, slow minor triads and a few wide sevenths.",
+    mode = MIN,
+    pads = {
+      { d = 1, t = "5" },
+      { d = 6, t = "5" },
+      { d = 3, t = "5" },
+      { d = 7, t = "5" },
+      { d = 1 },
+      { d = 4 },
+      { d = 6 },
+      { d = 5, t = "maj" },
+      { d = 1, t = "sus2" },
+      { d = 6, t = "maj7" },
+      { d = 3, t = "add9" },
+      { d = 7, t = "sus4" },
+      { d = 1, o = -1 },
+      { d = 4, o = -1 },
+      { d = 6, o = -1 },
+      { d = 2, t = "m7b5" },
+    },
+  },
+  {
+    name = "Dorian vamp",
+    desc = "Modal jazz and funk: i7 to IV7, the Dorian ii, sixth chords.",
+    mode = DOR,
+    pads = {
+      { d = 1, s = true },
+      { d = 4, t = "dom7" },
+      { d = 1, s = true },
+      { d = 2, s = true },
+      { d = 1 },
+      { d = 4 },
+      { d = 2 },
+      { d = 7 },
+      { d = 1, t = "m6" },
+      { d = 4, t = "6" },
+      { d = 7, s = true },
+      { d = 3, s = true },
+      { d = 1, s = true, i = 1 },
+      { d = 4, t = "dom7", i = 1 },
+      { d = 2, s = true, i = 1 },
+      { d = 1, t = "sus4" },
+    },
+  },
+  {
+    name = "Dark Phrygian",
+    desc = "The flat second rules: i, bII, bVII and bvii, for metal, flamenco and tension.",
+    mode = PHR,
+    pads = {
+      { d = 1 },
+      { d = 2 },
+      { d = 7 },
+      { d = 4 },
+      { d = 1, s = true },
+      { d = 2, s = true },
+      { d = 7, s = true },
+      { d = 4, s = true },
+      { d = 1, t = "5" },
+      { d = 2, t = "5" },
+      { d = 7, t = "5" },
+      { d = 3, t = "5" },
+      { d = 1, o = -1 },
+      { d = 2, o = -1 },
+      { d = 1, t = "sus4" },
+      { d = 2, t = "maj7" },
+    },
+  },
+  {
+    name = "Lydian dream",
+    desc = "Bright and floating: I, II and the raised fourth, with add9s.",
+    mode = LYD,
+    pads = {
+      { d = 1 },
+      { d = 2 },
+      { d = 3 },
+      { d = 7 },
+      { d = 1, s = true },
+      { d = 2, s = true },
+      { d = 3, s = true },
+      { d = 7, s = true },
+      { d = 1, t = "add9" },
+      { d = 2, t = "add9" },
+      { d = 5, t = "add9" },
+      { d = 3, t = "sus4" },
+      { d = 1, o = -1 },
+      { d = 2, o = -1 },
+      { d = 1, t = "maj7", i = 1 },
+      { d = 2, t = "dom7", i = 1 },
+    },
+  },
+  {
+    name = "Mixolydian groove",
+    desc = "Rock and funk: I bVII IV, the dominant seventh on the tonic, sus chords.",
+    mode = MIX,
+    pads = {
+      { d = 1 },
+      { d = 7 },
+      { d = 4 },
+      { d = 5 },
+      { d = 1, s = true },
+      { d = 7, s = true },
+      { d = 4, s = true },
+      { d = 5, s = true },
+      { d = 1, t = "sus4" },
+      { d = 1 },
+      { d = 7 },
+      { d = 4 },
+      { d = 1, o = -1 },
+      { d = 7, o = -1 },
+      { d = 4, o = -1 },
+      { d = 5, o = -1 },
+    },
+  },
+  {
     name = "Power chords",
+    desc = "Fifths only, two octaves, with bVII and bIII for riffs.",
     pads = {
       { d = 1, t = "5" },
       { d = 4, t = "5" },
@@ -258,6 +546,7 @@ M.FACTORY = {
   },
   {
     name = "Suspended / ambient",
+    desc = "No thirds: sus2, sus4 and add9 pads that sit under anything.",
     pads = {
       { d = 1, t = "sus2" },
       { d = 1, t = "sus4" },
@@ -275,6 +564,29 @@ M.FACTORY = {
       { d = 5, t = "sus4", o = -1 },
       { d = 4, t = "sus2", o = -1 },
       { d = 6, t = "sus2", o = -1 },
+    },
+  },
+  {
+    name = "Diminished & augmented",
+    desc = "Passing chords and tension: dim7 ladders, the augmented tonic, half-diminished.",
+    mode = MAJ,
+    pads = {
+      { d = 1 },
+      { d = 1, t = "aug" },
+      { d = 6 },
+      { d = 6, t = "dim7" },
+      { d = 7, t = "dim7" },
+      { d = 2, a = 1, t = "dim7" },
+      { d = 4, a = 1, t = "dim7" },
+      { d = 6, a = -1, t = "dim7" },
+      { d = 1, s = true },
+      { d = 1, t = "aug" },
+      { d = 4, s = true },
+      { d = 4, a = 1, t = "m7b5" },
+      { d = 2, s = true },
+      { d = 5, t = "dom7" },
+      { d = 7, t = "m7b5" },
+      { d = 3, t = "dom7" },
     },
   },
 }
@@ -336,6 +648,56 @@ function M.render(preset, key, mode, base_octave)
     end
   end
   return pads
+end
+
+---Write one pad as a spec relative to a key/mode. Roots outside the scale
+---are spelled as the flattened upper degree (bVII, bIII, ...).
+---@param pad Pad
+---@param key integer
+---@param mode integer
+---@return PresetPad|false
+function M.capture_pad(pad, key, mode)
+  if pads_mod.is_empty(pad) then
+    return false
+  end
+  local scale = theory.scale(key, mode)
+  local degree = theory.degree_of(pad.root, key, mode)
+  local acc = 0
+  if not degree then
+    for i, pc in ipairs(scale) do
+      if (pc - 1) % 12 == pad.root then
+        degree, acc = i, -1
+        break
+      end
+    end
+  end
+  assert(degree, "pad root not representable")
+  local spec = { d = degree, t = theory.CHORD_TYPES[pad.type].id }
+  if acc ~= 0 then
+    spec.a = acc
+  end
+  if pad.inversion ~= 0 then
+    spec.i = pad.inversion
+  end
+  if pad.octave ~= pads_mod.DEFAULT_OCTAVE then
+    spec.o = pad.octave - pads_mod.DEFAULT_OCTAVE
+  end
+  return spec
+end
+
+---Capture the pads as a preset relative to the current key and mode, so it
+---renders back into any key.
+---@param pads Pad[]
+---@param key integer
+---@param mode integer
+---@param name string
+---@return Preset
+function M.capture(pads, key, mode, name)
+  local specs = {}
+  for i = 1, pads_mod.COUNT do
+    specs[i] = M.capture_pad(pads[i] or pads_mod.empty(), key, mode)
+  end
+  return { name = name, mode = mode, pads = specs }
 end
 
 return M

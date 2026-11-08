@@ -25,8 +25,9 @@ local SPACING = renoise.ViewBuilder.DEFAULT_CONTROL_SPACING
 local GAP = renoise.ViewBuilder.DEFAULT_DIALOG_SPACING
 local MARGIN = 12
 local PANEL_GAP = 16
-local PAD_W, PAD_H, PAD_GAP = 104, 56, 6
+local PAD_W, PAD_H, PAD_GAP = 122, 64, 6
 local GRID_COLS, GRID_ROWS = 4, 4
+local GRID_W = GRID_COLS * PAD_W + (GRID_COLS - 1) * PAD_GAP
 local LABEL_H = renoise.ViewBuilder.DEFAULT_CONTROL_HEIGHT
 local CIRCLE_SIZE = 400
 
@@ -785,6 +786,7 @@ function M.build(app, palette)
     spacing = GAP,
     style = "group",
     margin = GAP,
+    size = { width = GRID_W, height = LABEL_H + 2 * GAP },
     vb:text { id = "editor_title", font = "bold", width = 44 },
     vb:row {
       spacing = SPACING,

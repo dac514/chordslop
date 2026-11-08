@@ -17,6 +17,7 @@ local player = require "src.player"
 local input = require "src.input"
 local circle = require "src.circle"
 local anim = require "src.anim"
+local presets = require "src.presets"
 
 local M = {}
 
@@ -43,6 +44,9 @@ local HELD_OUTER, HELD_INNER, HELD_CENTER = 100, 200, 300
 ---@field release fun(index: integer)
 ---@field learned fun(note: integer)
 ---@field refresh_all fun()
+---@field load_preset fun(index: integer) Popup index: factory first, then user presets.
+---@field save_preset fun(name: string)
+---@field delete_preset fun(index: integer)
 ---@field destroy fun()
 
 ---Key popup labels: both spellings so every key reads naturally.
@@ -357,6 +361,98 @@ function M.build(app, palette)
     renoise.app():show_status(("ChordSlop: pads start at MIDI note %s"):format(note_label(note)))
   end
 
+  -- Presets --------------------------------------------------------------------
+
+  local PRESET_SEPARATOR = "----"
+  local factory_count = #presets.FACTORY
+
+  ---@return string[]
+  local function preset_items()
+    local items = presets.names()
+    local user = store.user_preset_names(prefs)
+    if #user > 0 then
+      items[#items + 1] = PRESET_SEPARATOR
+      for _, name in ipairs(user) do
+        items[#items + 1] = name
+      end
+    end
+    return items
+  end
+
+  ---Popup index -> user preset index, or nil for factory entries and the separator.
+  ---@param index integer
+  ---@return integer?
+  local function user_index(index)
+    local u = index - factory_count - 1
+    if u >= 1 and u <= #store.user_preset_names(prefs) then
+      return u
+    end
+    return nil
+  end
+
+  ---@param select integer? Popup index to select afterwards.
+  local function refresh_presets(select)
+    local popup = vb.views.preset --[[@as renoise.Views.Popup]]
+    local items = preset_items()
+    syncing = true
+    popup.items = items
+    if select and select >= 1 and select <= #items then
+      popup.value = select
+    end
+    syncing = false
+    local del = vb.views.preset_delete --[[@as renoise.Views.Button]]
+    del.active = user_index(popup.value) ~= nil
+  end
+
+  ---@param pads Pad[]
+  local function replace_pads(pads)
+    ctl.pads = pads
+    save_pads()
+    ctl.selected = 1
+    ctl.refresh_all()
+  end
+
+  function ctl.load_preset(index)
+    if index <= factory_count then
+      local preset = presets.FACTORY[index]
+      if preset.mode and preset.mode ~= ctl.mode then
+        ctl.mode = preset.mode
+        prefs.mode.value = preset.mode
+        syncing = true
+        local mode_popup = vb.views.mode --[[@as renoise.Views.Popup]]
+        mode_popup.value = preset.mode
+        syncing = false
+      end
+      replace_pads(presets.render(preset, ctl.key, ctl.mode))
+      renoise.app():show_status(("ChordSlop: loaded %s"):format(preset.name))
+      return
+    end
+    local u = user_index(index)
+    if u then
+      replace_pads(store.load_user_preset(prefs, u))
+      renoise.app():show_status(("ChordSlop: loaded %s"):format(store.user_preset_names(prefs)[u]))
+    end
+  end
+
+  function ctl.save_preset(name)
+    name = (name or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if name == "" then
+      name = ("Preset %d"):format(#store.user_preset_names(prefs) + 1)
+    end
+    local u = store.save_user_preset(prefs, name, ctl.pads)
+    refresh_presets(factory_count + 1 + u)
+    renoise.app():show_status(("ChordSlop: saved %s"):format(name))
+  end
+
+  function ctl.delete_preset(index)
+    local u = user_index(index)
+    if not u then
+      return
+    end
+    store.delete_user_preset(prefs, u)
+    refresh_presets(1)
+  end
+
   -- Circle of fifths -------------------------------------------------------------
 
   local layout = circle.layout(CIRCLE_SIZE)
@@ -615,6 +711,51 @@ function M.build(app, palette)
         tooltip = "Changing the key moves every pad with it",
       },
     },
+    vb:row {
+      spacing = SPACING,
+      vb:text { text = "Preset", style = "disabled" },
+      vb:popup {
+        id = "preset",
+        width = 180,
+        items = preset_items(),
+        tooltip = "Factory presets follow the key and mode; your own presets are stored as written",
+        notifier = app.guard(function()
+          if not syncing then
+            refresh_presets()
+          end
+        end),
+      },
+      vb:button {
+        id = "preset_load",
+        text = "Load",
+        notifier = app.guard(function()
+          local popup = vb.views.preset --[[@as renoise.Views.Popup]]
+          ctl.load_preset(popup.value)
+        end),
+      },
+      vb:space { width = GAP },
+      vb:textfield {
+        id = "preset_name",
+        width = 120,
+        tooltip = "Name for saving the current pads as a preset",
+      },
+      vb:button {
+        id = "preset_save",
+        text = "Save",
+        notifier = app.guard(function()
+          local field = vb.views.preset_name --[[@as renoise.Views.TextField]]
+          ctl.save_preset(field.value)
+        end),
+      },
+      vb:button {
+        id = "preset_delete",
+        text = "Delete",
+        notifier = app.guard(function()
+          local popup = vb.views.preset --[[@as renoise.Views.Popup]]
+          ctl.delete_preset(popup.value)
+        end),
+      },
+    },
   }
 
   local circle_panel = vb:column {
@@ -812,6 +953,7 @@ function M.build(app, palette)
 
   refresh_midi_popup()
   refresh_learn()
+  refresh_presets(1)
   ctl.refresh_all()
   anim.init(app, app.guard(apply_rotation), rotation)
   return vb, root, ctl --[[@as UiController]]

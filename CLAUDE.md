@@ -86,10 +86,19 @@ docs/renoise/                 vendored xrnx guide pages (start/, guide/)
 .github/workflows/release.yml tag v* -> GitHub release with the .xrnx attached
 <Id>.xrnx/manifest.xml        Id, Version, ApiVersion (rules under Hard constraints)
 <Id>.xrnx/cover.png           optional renoise.com cover (600x350), with thumbnail.png (120x45)
-<Id>.xrnx/main.lua            thin entry: package.path, preferences, APP = require "src.app", APP.start(), dev bridge
-<Id>.xrnx/src/app.lua         App.start/stop, App.reg (menu/key/notifier/timer), App.register_dialog, App.guard, App.defer
-<Id>.xrnx/src/ui.lua          ViewBuilder dialog; returns (vb, root)
-<Id>.xrnx/src/labels.lua      pure Lua (no renoise.*): the dialog's label strings; the unit-tested example
+<Id>.xrnx/main.lua            thin entry: package.path, preferences schema (ChordSlopPreset model, then ChordSlopPreferences), APP.start(), dev bridge
+<Id>.xrnx/src/app.lua         App.start/stop, App.reg (menu/key/notifier/timer/midi), dialog key/focus/watch handlers, App.guard, App.defer
+<Id>.xrnx/src/ui.lua          ViewBuilder dialog: header, circle-of-fifths stack (canvas + ring buttons), 4x4 pads, editor, footer; returns (vb, root, ctl)
+<Id>.xrnx/src/player.lua      held notes, trigger_instrument_note_on/off, applies record plans to the pattern
+<Id>.xrnx/src/store.lua       preferences adapter: pads <-> number lists, user preset DocumentList CRUD
+<Id>.xrnx/src/anim.lua        circle rotation tween on an App.reg timer
+<Id>.xrnx/src/theory.lua      pure: chord types, modes, build_notes, roman numeral analysis (tests/theory_test.lua)
+<Id>.xrnx/src/pads.lua        pure: 16-pad model, transpose, labels, list round trip
+<Id>.xrnx/src/circle.lua      pure: circle-of-fifths geometry, rotation targets, easing, ring chords
+<Id>.xrnx/src/input.lua       pure: MIDI decode, MIDI/QWERTY note -> pad index
+<Id>.xrnx/src/record.lua      pure: where a chord is written (step/live), note-off placement
+<Id>.xrnx/src/presets.lua     pure: degree-based factory presets and rendering into pads
+<Id>.xrnx/src/colors.lua      pure: pad palette from the theme button colour
 tests/helper.lua              test helpers for tests/*_test.lua
 <Id>.xrnx/dev/                dev bridge (bridge.lua, commands.lua, serialize.lua, home_port.lua); never shipped
 ```
@@ -102,10 +111,11 @@ tests/helper.lua              test helpers for tests/*_test.lua
   and `package` strips it. `tests/` lives outside the bundle and is never shipped.
 - The bridge binds `127.0.0.1`. A non-loopback bind (`dev/bind`) requires the token in
   `dev/.token`; `install` writes both on WSL.
-- Logic worth unit-testing goes in a pure module (like `src/labels.lua`): no `renoise.*`
+- Logic worth unit-testing goes in a pure module (like `src/theory.lua`): no `renoise.*`
   and no Renoise additions to the Lua stdlib (`table.find`, `oprint`, ...), because
-  `just test` runs under plain LuaJIT where those do not exist. `src/app.lua` and
-  `src/ui.lua` are not testable that way; keep them thin and push logic into pure modules.
+  `just test` runs under plain LuaJIT where those do not exist. `src/app.lua`, `src/ui.lua`,
+  `src/player.lua`, `src/store.lua` and `src/anim.lua` are not testable that way; keep them
+  thin and push logic into pure modules.
   A test is `tests/<name>_test.lua`: `local t = require "tests.helper"`, then `t.eq`,
   `t.check`, `t.fails`, and `t.done()` last (it exits non-zero on failure).
 - `main.lua` stays thin and idempotent. Behaviour lives in `src/` behind

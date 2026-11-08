@@ -1,150 +1,38 @@
-# ReSlop
+# ChordSlop
 
-Build Renoise tools with a coding assistant doing the typing.
+Chord pads for [Renoise](https://www.renoise.com) with a circle of fifths that
+turns to the key you are in. Sixteen pads, playable from the mouse, a MIDI
+controller or the QWERTY keyboard, recording straight into the pattern editor.
 
-Renoise tools are small Lua scripts (`.xrnx` files) that add menus, dialogs and
-new tricks to [Renoise](https://www.renoise.com). ReSlop is a starter kit for
-making them. You get a little tool that already works, the complete Renoise API
-reference in a form your editor and coding assistants can read, and a bridge
-that lets an assistant run code inside your running Renoise, inspect your
-dialogs and reload your tool without you lifting a finger.
+The tool itself lives in [`com.dac514.ChordSlop.xrnx/`](com.dac514.ChordSlop.xrnx/);
+its [README](com.dac514.ChordSlop.xrnx/README.md) is the user guide. Everything else
+in this repository is development tooling from the
+[ReSlop](https://github.com/dac514/reslop) kit: a `justfile`, `scripts/renoise.py`,
+the vendored Renoise API definitions, and unit tests.
 
-Yes, the name is a joke. The tools you make with it don't have to be.
+## Install
 
-Questions or ideas? There is a
-[thread on the Renoise forum](https://forum.renoise.com/t/reslop-a-template-to-build-claude-code-tools/79678).
+Download the `.xrnx` from the
+[releases page](https://github.com/dac514/chordslop/releases) and drag it onto
+Renoise, or use the version on renoise.com once it is published.
 
-## What's in the box
-
-```
-<Id>.xrnx/            your tool: manifest.xml, main.lua, src/ (logic and dialog), dev/ (the bridge)
-scripts/renoise.py    one small Python script that does all the chores below
-justfile              short names for the chores, so you can type `just reload`
-tests/                unit tests that run without Renoise (`just test`)
-definitions/          the Renoise API, annotated, for the type checker and coding assistants
-docs/                 setup steps and renoise.com rules, for your assistant
-docs/renoise/         the Renoise scripting guide, offline
-CLAUDE.md             the canonical briefing for Claude Code
-UPGRADING.md          bring later kit fixes into a project made from an older ReSlop
-.github/              instructions for GitHub Copilot and Copilot CLI
-.github/workflows/    checks on every push; a release with the .xrnx on every tag
-.vscode/              VS Code: recommended extensions (Lua, StyLua, just) and format on save
-```
-
-The example tool adds *Tools → ChordSlop...* to Renoise's menu. Its dialog shows
-the song name, a live BPM read-out, a track count that follows the song, a text
-field that remembers what you type, and a button. It is small on purpose: it
-shows the patterns, then gets out of the way. The label text lives in a plain
-Lua module with a unit test next to it, so you can see how to test logic
-without a running Renoise.
-
-## Doing it by hand
-
-If you would rather type the commands yourself, this is what the setup prompt
-does for you.
-
-Install five things: [just](https://github.com/casey/just) (runs the chores),
-[StyLua](https://github.com/JohnnyMorganz/StyLua) (formats Lua),
-[lua-language-server](https://github.com/LuaLS/lua-language-server) 3.13.6 or
-newer (checks Lua against the Renoise API),
-[LuaJIT](https://luajit.org/download.html) (runs the unit tests), and
-[Python 3.8 or newer](https://www.python.org/downloads/) (runs the script; no
-packages needed).
-
-- macOS: `brew install just stylua lua-language-server luajit`
-- Windows: `winget install Casey.Just JohnnyMorganz.StyLua LuaLS.lua-language-server Python.Python.3.13`
-  and `scoop install luajit` (or work inside WSL and follow the Linux line)
-- Fedora, Ubuntu, WSL: `just` and `luajit` from your package manager, StyLua and
-  lua-language-server from their GitHub release archives, unpacked into `~/.local/bin`
-
-Then:
+## Develop
 
 ```
-just doctor      # lists what is missing and where to get it
-just init com.yourname.ToolName "Tool Name" "Your Name [you@example.com]"
-just install     # Renoise copies the tool into its Tools folder and loads it
-just ping        # ok bridge at 127.0.0.1:18xxx, tool_id=com.yourname.ToolName ...
+just doctor      # check stylua, lua-language-server, luajit, Renoise, the dev bridge
+just check       # formatting + types (+ Renoise's own parser when Renoise runs)
+just test        # unit tests under plain LuaJIT, no Renoise needed
+just install     # install into the running Renoise
+just reload      # reinstall after edits
+just package     # dist/com.dac514.ChordSlop.xrnx
 ```
 
-No `just` yet? Every recipe is a one-liner around the script, so
-`python3 scripts/renoise.py doctor` works just as well.
+The music theory, pad model, circle geometry, MIDI/QWERTY decoding, recording
+placement and presets are pure Lua modules under `src/` with tests in `tests/`.
+Only `app.lua`, `ui.lua`, `player.lua`, `store.lua` and `anim.lua` talk to Renoise.
 
-## Day to day
+See [CLAUDE.md](CLAUDE.md) for the full development notes.
 
-```
-just check          # formatting + type check against the Renoise API
-just test           # unit tests under plain LuaJIT, no Renoise needed
-just reload         # full reload: zip the tool and have Renoise reinstall it (about a second)
-just reload-soft    # quicker: swap in src/ without restarting the tool
-just eval 'return renoise.song().transport.bpm'
-just eval 'APP.show_dialog()' && just views
-just log            # prints and errors from inside the tool
-just screenshot     # PNG of the Renoise window and any open dialog, into dist/
-just package        # dist/<Id>.xrnx, ready to share (the dev bridge is left out)
-```
+## License
 
-To publish on renoise.com, upload `dist/<Id>.xrnx` at
-[renoise.com/submit/tool](https://www.renoise.com/submit/tool). The tool page
-shows your tool's `README.md`, plus a `cover.png` (600x350) and a
-`thumbnail.png` (120x45) from the tool folder. `docs/publishing.md` lists the
-site's other rules.
-
-## How your assistant sees Renoise
-
-Renoise has no command line, and `print` only reaches its Scripting Terminal.
-So the kit ships a small **dev bridge** inside the tool (`dev/bridge.lua`): a
-TCP server on `127.0.0.1` with its own port (shown by `just ping`), living in
-the tool's own Lua state. It is loaded only while `dev/` exists and never
-included by `just package`. The `scripts/renoise.py` CLI talks to the bridge:
-
-- `eval` runs Lua with full access to the tool (`APP`, `renoise`, `io`), captures
-  `print` output and returns values as text.
-- `views` walks the dialog tree of every registered dialog, so layout and
-  state can be verified without a screenshot.
-- `reload` re-zips the tool and asks Renoise to reinstall it through the OSC
-  server, giving a fresh Lua state in about a second; `reload --soft` swaps in
-  `src/` in place instead.
-- `log` keeps the last 500 prints and errors; `check` parses the sources with
-  Renoise's own LuaJIT.
-
-Renoise's OSC server is used only as a trigger (`/renoise/evaluate` →
-`renoise.app():install_tool(zip)`), because it cannot send anything back.
-Screenshots are best effort per OS: on X11 every Renoise window is captured,
-so an open tool dialog lands in its own PNG; elsewhere you get the whole screen
-(`spectacle`, `gnome-screenshot`, `grim`, `screencapture`, PowerShell).
-
-## Upgrading
-
-Projects created from ReSlop don't receive later kit updates automatically.
-To bring a project up to date, ask your coding assistant:
-
-> Check the latest upgrade instructions in
-> [ReSlop's UPGRADING.md](https://github.com/dac514/reslop/blob/main/UPGRADING.md)
-> and apply all updates relevant to this project. Preserve project-specific
-> changes and verify the result.
-
-## Platform notes
-
-| | Linux | macOS | Windows (native) | WSL (Linux tools, Windows Renoise) |
-|---|---|---|---|---|
-| Tools folder | `~/.config/Renoise/V*/Scripts/Tools` | `~/Library/Preferences/Renoise/V*/Scripts/Tools` | `%APPDATA%\Renoise\V*\Scripts\Tools` | found via `powershell.exe $env:APPDATA` |
-| `just install` | OSC, else symlink | OSC, else symlink | OSC, else copy (`--link` = junction) | OSC, else copy |
-| Bridge bind | 127.0.0.1 | 127.0.0.1 | 127.0.0.1 | `0.0.0.0` + token (NAT mode cannot reach the host's loopback) |
-| Screenshot | window or screen | screen | screen | screen via `powershell.exe` |
-
-WSL: `just install` writes `dev/bind` (`0.0.0.0`) and `dev/.token` so the bridge
-is reachable from the WSL network namespace and still refuses unauthenticated
-peers; the client tries `127.0.0.1`, the default gateway and the resolv.conf
-nameserver as hosts. With mirrored networking (`.wslconfig`), pass
-`--loopback` to keep everything on localhost. Paths handed to Renoise are
-converted with `wslpath -w`.
-
-Environment overrides: `RENOISE_PREFS_DIR`, `RENOISE_VERSION`, `RENOISE_HOST`,
-`RENOISE_DEV_PORT`, `RENOISE_OSC_PORT`.
-
-## Credits and license
-
-MIT. Bundles the MIT-licensed
-[renoise/definitions](https://github.com/renoise/definitions) and guide pages from
-[renoise/xrnx](https://github.com/renoise/xrnx); see the `UPSTREAM.md` files for
-the exact commits.
+MIT, see [LICENSE](LICENSE).

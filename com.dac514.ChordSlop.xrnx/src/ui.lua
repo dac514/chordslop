@@ -1012,6 +1012,17 @@ function M.build(app, palette)
           app.set_midi_device(name)
         end),
       },
+      vb:popup {
+        id = "midi_layout",
+        width = 150,
+        items = layout_items(),
+        bind = prefs.midi_layout,
+        tooltip = TIP_LAYOUT,
+        notifier = app.guard(function()
+          refresh_pads()
+        end),
+      },
+      vb:space { width = GAP },
       vb:text { text = "Low note", style = "disabled", tooltip = TIP_MIDI_BASE },
       vb:valuebox {
         id = "midi_base",
@@ -1033,16 +1044,6 @@ function M.build(app, palette)
         notifier = app.guard(function()
           ctl.learn_armed = not ctl.learn_armed
           refresh_learn()
-        end),
-      },
-      vb:popup {
-        id = "midi_layout",
-        width = 150,
-        items = layout_items(),
-        bind = prefs.midi_layout,
-        tooltip = TIP_LAYOUT,
-        notifier = app.guard(function()
-          refresh_pads()
         end),
       },
       vb:space { width = GAP },

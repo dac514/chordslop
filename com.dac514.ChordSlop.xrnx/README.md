@@ -11,9 +11,9 @@ to a key.
 ## The circle
 
 Twelve major chords around the outside, their relative minors inside. Walk
-clockwise and each chord is a fifth up from the last: C, G, D, A. That order
-is the point. Neighbours share two of their three notes, so moving between
-them sounds smooth; jump across the circle and it sounds like a jump. The
+clockwise and each chord is a fifth up from the last: C, G, D, A. Neighbours
+share two of their three notes, so moving between them sounds smooth; jump
+across the circle and it sounds like a jump. The
 shaded wedge covers the seven chords that live in the current key, and the
 key itself sits at the top. Change the key and the whole thing turns.
 

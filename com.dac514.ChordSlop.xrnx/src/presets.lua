@@ -488,7 +488,7 @@ M.FACTORY = {
       { d = 5, t = "sus2" },
       { d = 5, t = "sus4" },
       { d = 4, t = "sus2" },
-      { d = 4, t = "sus4" },
+      { d = 3, t = "sus4" },
       { d = 2, t = "sus2" },
       { d = 2, t = "sus4" },
       { d = 1, t = "add9" },

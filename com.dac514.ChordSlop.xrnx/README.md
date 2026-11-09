@@ -1,89 +1,132 @@
 # ChordSlop
 
-Sixteen pads full of chords that belong together, a circle of fifths that
-shows you why, and a straight line into the pattern editor. Hit a pad with the
-mouse, a controller or the keyboard; hear it; with edit mode on, it is written
-down.
+ChordSlop gives you 16 chord pads and a circle of fifths. The circle shows
+how each chord relates to the key. You can play the pads with the mouse, a
+MIDI controller or the computer keyboard. When edit mode is on, ChordSlop
+writes each chord into the pattern editor.
 
-Open it from *Tools > ChordSlop...*, or bind *Global > Tools > Show ChordSlop*
-to a key.
+To open ChordSlop, choose *Tools > ChordSlop...*. You can also assign a key
+to *Global > Tools > Show ChordSlop*.
 
 ## The circle
 
-Twelve major chords around the outside, their relative minors inside. Walk
-clockwise and each chord is a fifth up from the last: C, G, D, A. Neighbours
-share two of their three notes, so moving between them sounds smooth; jump
-across the circle and it sounds like a jump. The shaded wedge covers the seven
-chords that live in the current key, and the key itself sits at the top.
-Change the key and the whole thing turns.
+The circle shows how far each chord is from the current key.
 
-So the circle is a map. Green is home. Next door is a safe step. Far side is
-drama. Click any chord to hear it, click the centre for the tonic, and while a
-pad sounds its chord lights up on the circle, so you can see where your
-progression is wandering.
+Twelve major chords sit on the outer ring. The inner ring holds the relative
+minor of each one. Clockwise, each chord is a fifth above the one before it:
+C, G, D, A. Neighbouring chords share notes, so a change between them sounds
+smooth. A change to the other side of the circle sounds like a big step.
 
-Switch *Play* to *Assign to pad* and every chord you click lands on the
-selected pad and moves on to the next. A progression in four clicks.
+The colours show the distance from the key:
+
+- Green chords are the seven chords of the key. They fill three neighbouring
+  columns, and the diminished chord sits next to them on the inner ring. In C
+  major, the green chords are F, C, G, Dm, Am, Em and B°.
+- Blue chords are one column outside the green ones. Each blue chord changes
+  one note of the key. In C major, the blue chords are Bb, Gm and D.
+- Gray chords are further away from the key.
+
+In a minor key, the major chord on the fifth degree is green as well. Most
+music in a minor key uses this chord. In C minor, it is G major.
+
+The tonic chord sits at the top, under the marker, and its name is bold. When
+you change the key or the mode, the circle turns. Point the mouse at a chord
+to see its roman numeral and the notes that are not in the key. Point at the
+centre of the circle to read a short explanation of the colours.
+
+Click a chord to hear it. Click the centre to hear the tonic chord. While a
+pad plays, its chord is lit on the circle. This shows you where your chord
+progression goes.
+
+Under the circle, switch from *Play* to *Assign to pad*. Each chord that you
+click then goes to the selected pad, and ChordSlop selects the next pad. Four
+clicks give you a progression of four chords.
 
 ## The pads
 
-A 4x4 grid. Green pads are in the key, grey ones are not, same as the circle.
-Under each pad: its roman numeral and the keyboard key that plays it. Clicking
-a pad selects it; the editor below sets its root, chord type, inversion and
-octave and shows the exact notes.
+The grid has four rows of four pads. Each pad has the same colour as the chord
+that it lights on the circle. Under each pad, you see its roman numeral and
+the computer key that plays it. Click a pad to select it. The editor under the
+grid sets the root, chord type, inversion and octave of the selected pad. It
+also shows the notes of the chord.
 
-**Key and mode** are the frame everything hangs in. Pick a root and one of
-seven modes. *Transpose pads with key* moves every pad along when you change
-key; untick it and the pads stay put while the colours tell you how they fit.
+Power chords and suspended chords have no third. Such a chord lights the major
+or the minor chord on its root, whichever one is closer to the key. A pad that
+changes a note of the key is blue, even when it lights a green chord. While
+the pad plays, that chord turns blue as well.
 
-**Presets** are sixteen-chord palettes: pop loops, doo-wop, Pachelbel, jazz
-turnarounds, bossa, gospel, lo-fi, four flavours of minor, Dorian, Phrygian,
-Lydian, Mixolydian, power chords, ambient sus pads. Every one of them stays in
-the key, so whatever you pick, nothing on the grid is a wrong note. They are
-written as scale degrees, so they follow the key, and most set the mode they
-were made for. Change the mode afterwards and the preset is re-rendered in it:
-the jazz ii V I becomes a minor ii V i. Hover the list for a one-line
-description. Once you edit a pad the list shows the preset's name with an
-asterisk; pick it again to get it back. *Save* keeps your own layout under a
-name, also relative to the key and mode, so it transposes and re-renders like
-the rest. *Delete* removes it again.
+**Key and mode.** Choose a root note and one of seven modes. Together they set
+the key for the circle, the colours and the presets. When *Transpose pads with
+key* is on, every pad moves with the key when you change it. When it is off,
+the pads keep their chords, and the colours show how those chords fit the new
+key.
+
+**Presets.** A preset fills all 16 pads with chords that belong together.
+There are presets for pop progressions, 1950s progressions, Pachelbel's Canon,
+jazz, bossa nova, gospel, neo-soul, lo-fi hip hop and five kinds of minor.
+Others are for Dorian, Phrygian, Lydian and Mixolydian, for power chords and
+for suspended chords. In the mode that a preset was written for, all of its
+pads are green.
+
+Presets are written as scale degrees, so they follow the key. Most presets
+also set the mode that they were written for. If you change the mode later,
+ChordSlop builds the preset again in the new mode. For example, the jazz
+ii V I becomes a minor ii V i. Point the mouse at the list to read a short
+description of each preset.
+
+After you edit a pad, the list shows the name of the preset with an asterisk.
+Choose the preset again to restore it. *Save* stores your own layout under a
+name. ChordSlop stores it relative to the key and mode, so it follows the key
+like the factory presets. *Delete* removes a saved layout.
 
 ## Playing
 
-**Mouse.** Press a pad or a circle chord. Release to stop.
+**Mouse.** Press a pad or a chord on the circle to play it. Release the mouse
+button to stop it.
 
-**MIDI.** Choose the device, then how its sixteen notes map onto the grid:
-*MPK mini banks* (default) puts bank A on the top two rows and bank B below,
-laid out like the controller; *Rows top to bottom* and *Rows bottom to top*
-do what they say. The *Low note* is the lowest pad note (C-3, MIDI 36, on an
-MPK mini); press *Learn* and hit that pad to set it. Velocity is recorded.
+**MIDI.** Choose your MIDI device. Then choose how its 16 notes map to the
+grid:
 
-Take the controller out of Renoise's own MIDI inputs (*Preferences > MIDI >
-In Device A/B*). ChordSlop reads it directly; if Renoise also listens, edit
-mode records the raw pad note on top of the chord.
+- *MPK mini banks* is the default. Bank A plays the top two rows and bank B
+  plays the bottom two rows. Each bank has the same layout as on the
+  controller.
+- *Rows top to bottom* puts the lowest note at the top left.
+- *Rows bottom to top* puts the lowest note at the bottom left, as on a drum
+  machine.
 
-**QWERTY.** With the ChordSlop window focused, Renoise's piano keys play the
-pads: `z s x d c v g b h n j m` for 1 to 12, `q 2 w 3` for 13 to 16. Untick
-*QWERTY pads* to let every key through to Renoise.
+*Low note* is the lowest note of the controller pads. On an MPK mini, it is
+C-3, which is MIDI note 36. To set it, press *Learn* and then hit that pad on
+the controller. ChordSlop records the velocity of each pad hit.
+
+Remove the controller from the MIDI inputs of Renoise, in
+*Preferences > MIDI > In Device A/B*. ChordSlop reads the controller directly. If Renoise also
+reads it, edit mode records the note of the pad together with the chord.
+
+**Computer keyboard.** When the ChordSlop window has the focus, the piano keys
+of Renoise play the pads. The keys `z s x d c v g b h n j m` play pads 1 to
+12, and the keys `q 2 w 3` play pads 13 to 16. Clear *QWERTY pads* to send
+every key to Renoise.
 
 ## Recording
 
-The footer tells you what a press will do.
+The text at the bottom of the window tells you what a pad press will do.
 
-- **Edit mode off**: just plays.
-- **Edit mode on, stopped**: the chord is written across note columns at the
-  cursor and the cursor advances by the edit step, like typing notes. Columns
-  are added as needed, up to twelve.
-- **Edit mode on, playing**: the chord goes in at the playhead when you press,
-  note-offs where you release.
+- When edit mode is off, the chord only plays.
+- When edit mode is on and the song is stopped, ChordSlop writes the chord at
+  the cursor, one note in each note column. Then the cursor moves by the edit
+  step, as when you type notes. ChordSlop adds note columns when it needs
+  them, up to 12.
+- When edit mode is on and the song plays, ChordSlop writes the chord at the
+  playhead when you press. It writes the note-offs where you release.
 
-One chord, one undo step. Pads always play through the selected instrument on
-the selected track; recording wants a sequencer track.
+Each chord is one undo step. The pads always play the selected instrument on
+the selected track. To record, select a sequencer track.
 
-*Animate* turns the circle smoothly when the key or mode changes. Untick it
-for an instant jump.
+*Animate* makes the circle turn smoothly when you change the key or the mode.
+Clear it to make the circle change at once.
 
 ## Install
 
-Drag `com.dac514.ChordSlop.xrnx` onto Renoise. Needs Renoise 3.5 or newer.
-Source and issues: https://github.com/dac514/chordslop
+Drag `com.dac514.ChordSlop.xrnx` onto Renoise. ChordSlop needs Renoise 3.5 or
+newer. The source code and the issue tracker are at
+https://github.com/dac514/chordslop.

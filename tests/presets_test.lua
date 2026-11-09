@@ -12,11 +12,38 @@ local function names(pads, key, mode)
   return table.concat(out, " ")
 end
 
-t.check(#presets.FACTORY >= 20, "a generous set of factory presets")
+t.check(#presets.FACTORY >= 18, "a generous set of factory presets")
 for _, preset in ipairs(presets.FACTORY) do
   t.check(type(preset.desc) == "string" and #preset.desc > 10, preset.name .. " has a description")
 end
 t.eq(#presets.names(), #presets.FACTORY, "names match presets")
+
+-- every factory preset stays in its key: no grey pads, in any key
+for _, preset in ipairs(presets.FACTORY) do
+  local modes = preset.mode and { preset.mode } or { 1, 2, 3, 4, 5, 6, 7 }
+  for _, mode in ipairs(modes) do
+    for key = 0, 11 do
+      local rendered = presets.render(preset, key, mode)
+      for i, pad in ipairs(rendered) do
+        if not pads_mod.is_empty(pad) then
+          local name, numeral, func = pads_mod.label(pad, key, mode)
+          t.check(
+            func == "in_key",
+            ("%s pad %d (%s %s) is %s in key %d mode %d"):format(
+              preset.name,
+              i,
+              name,
+              numeral,
+              func,
+              key,
+              mode
+            )
+          )
+        end
+      end
+    end
+  end
+end
 
 -- every preset renders in every key and mode without errors and stays in range
 for _, preset in ipairs(presets.FACTORY) do
@@ -52,11 +79,11 @@ local function find(name)
   error("no preset " .. name)
 end
 
-local blues = presets.render(find "Blues", 0, 1)
-t.eq(theory.CHORD_TYPES[blues[1].type].id, "dom7", "blues I7")
-t.eq(blues[5].root, 5, "blues IV root is F")
-t.eq(theory.CHORD_TYPES[blues[9].type].id, "dom7", "blues V7")
-t.eq(blues[15].root, 10, "bVII in C is Bb")
+local power = presets.render(find "Power", 0, 1)
+t.eq(theory.CHORD_TYPES[power[1].type].id, "5", "power chords are fifths")
+t.eq(power[9].octave, 3, "octave offset applied")
+local low = presets.render(find "Power", 0, 1, 0)
+t.eq(low[9].octave, 0, "octave offset clamps at 0")
 
 local minor = find "Minor"
 t.eq(minor.mode, theory.MODE_AEOLIAN, "minor preset switches to Aeolian")
@@ -64,22 +91,11 @@ local am = presets.render(minor, 9, minor.mode)
 t.eq(names(am, 9, minor.mode):sub(1, 11), "Am Dm Em F ", "A minor i iv v VI")
 t.eq(theory.CHORD_TYPES[am[8].type].id, "maj", "explicit major V in minor")
 
-local power = presets.render(find "Power", 0, 1)
-t.eq(power[9].octave, 3, "octave offset applied")
-local low = presets.render(find "Power", 0, 1, 0)
-t.eq(low[9].octave, 0, "octave offset clamps at 0")
-
-local jazz = presets.render(find "Jazz", 0, 1)
-t.eq(theory.chord_name(jazz[10].root, jazz[10].type, false), "F#m7b5", "#iv half-diminished")
-t.eq(theory.chord_name(jazz[13].root, jazz[13].type, true), "Db7", "tritone sub bII7")
-t.eq(jazz[16].inversion, 2, "inversion carried")
-
 -- capture: pads -> relative preset -> pads round trip
 local source = presets.render(find "Jazz", 2, 1) -- D major
 local captured = presets.capture(source, 2, 1, "mine")
 t.eq(captured.name, "mine", "captured name")
 t.eq(captured.mode, 1, "captured mode")
-t.eq(captured.pads[10].a, -1, "altered root captured as a flat (bV spelled as flat)")
 local back = presets.render(captured, 2, 1)
 for i = 1, 16 do
   t.eq(

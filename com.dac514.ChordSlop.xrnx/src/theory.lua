@@ -156,6 +156,15 @@ function M.scale(key, mode)
   return pcs
 end
 
+---The harmonic minor scale on `key`: natural minor with the seventh raised.
+---@param key integer 0-11
+---@return integer[]
+function M.harmonic_minor(key)
+  local pcs = M.scale(key, M.MODE_AEOLIAN)
+  pcs[7] = (pcs[7] + 1) % 12
+  return pcs
+end
+
 ---@param pc integer 0-11
 ---@param key integer 0-11
 ---@param mode integer 1-7
@@ -238,9 +247,10 @@ end
 ---@field func "in_key"|"borrowed"|"out"
 
 ---Analyse a chord against a key: numeral and how well it fits.
----`in_key`: every tone is in the scale. `borrowed`: every tone is in the parallel
----major/minor scale, or the root is in the scale but a tone is not (secondary
----dominants and the like). `out`: anything else.
+---`in_key`: every tone is in the scale (in a minor key the harmonic minor also
+---counts, so the major V and V7 everybody plays are in key). `borrowed`: every
+---tone is in the parallel major/minor scale, or the root is in the scale but a
+---tone is not (secondary dominants and the like). `out`: anything else.
 ---@param root integer 0-11
 ---@param type_index integer 1..#CHORD_TYPES
 ---@param key integer 0-11
@@ -254,7 +264,7 @@ function M.analyze(root, type_index, key, mode)
   end
   local scale = M.scale(key, mode)
   local func
-  if all_in(tones, scale) then
+  if all_in(tones, scale) or (mode == M.MODE_AEOLIAN and all_in(tones, M.harmonic_minor(key))) then
     func = "in_key"
   else
     local major_ish = M.MODES[mode].brightness <= 2

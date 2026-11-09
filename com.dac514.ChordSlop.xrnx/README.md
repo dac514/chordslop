@@ -27,8 +27,9 @@ centre button plays the tonic. Switch *Play* to *Assign to pad* and each chord
 you click lands on the selected pad, then the selection moves to the next pad,
 so you can lay out a progression in a few clicks.
 
-**Pads.** A 4x4 grid. Green pads hold chords of the key, grey pads anything
-else, exactly like the circle. Under each pad: its roman numeral (with a flat or
+**Pads.** A 4x4 grid. Green pads hold chords of the key (in a minor key that
+includes the harmonic-minor V and V7), grey pads anything else, exactly like
+the circle. Under each pad: its roman numeral (with a flat or
 sharp when the root is outside the scale) and the computer key that plays it.
 Click a pad to select it and hear it. While a pad sounds, its chord lights up on
 the circle, and while a circle chord sounds, every pad holding it lights up.
@@ -36,10 +37,12 @@ the circle, and while a circle chord sounds, every pad holding it lights up.
 **Pad editor.** Root, chord type, inversion and octave of the selected pad, and
 the exact notes it will play. *Clear* empties the pad.
 
-**Presets.** Two dozen factory presets, from diatonic palettes and pop loops to
-jazz turnarounds, blues, modal vamps, power chords and film-score colour. They are
-written as scale degrees, so they render into the current key, and some switch the
-mode (minor, Dorian, Phrygian, Lydian, Mixolydian sets). Picking one from the list puts
+**Presets.** Twenty factory presets, from the plain diatonic palette and pop
+loops to jazz turnarounds, modal vamps, power chords and ambient sus chords.
+Every one of them stays inside the key, so whatever you pick, the sixteen pads
+belong together and all light up green. They are written as scale degrees, so
+they render into the current key, and most set the mode they are written for
+(major, minor, Dorian, Phrygian, Lydian, Mixolydian). Picking one from the list puts
 it on the pads; hover the list for a one-line description. *Save* stores the current pads under a name of your own,
 also relative to the key, so your presets transpose like the factory ones.
 *Delete* removes the selected preset of yours.

@@ -56,6 +56,11 @@ each arranged like the controller itself; *Rows top to bottom* counts from the
 top-left pad; *Rows bottom to top* counts from the bottom-left like a drum
 machine. Velocity is recorded when the instrument's velocity column is in use.
 
+Take the controller out of Renoise's own MIDI inputs (*Preferences > MIDI >
+In Device A/B*). ChordSlop opens the device directly and keeps working; if
+Renoise also listens to it, edit mode records the raw pad note on top of the
+chord.
+
 **QWERTY.** While the ChordSlop window has focus, Renoise's piano keys play the
 pads: `z s x d c v g b h n j m` for pads 1 to 12 and `q 2 w 3` for 13 to 16.
 Untick *QWERTY pads* to let every key through to Renoise.

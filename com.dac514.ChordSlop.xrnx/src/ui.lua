@@ -1001,7 +1001,7 @@ function M.build(app, palette)
         id = "midi_device",
         width = 190,
         items = midi_items(),
-        tooltip = "MIDI input device whose notes trigger the pads",
+        tooltip = "MIDI input device whose notes trigger the pads. Remove it from Renoise's own MIDI inputs (Preferences > MIDI), or edit mode records the raw pad note as well.",
         notifier = app.guard(function(value)
           if syncing then
             return

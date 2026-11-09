@@ -5,7 +5,7 @@
   <Version>1.00</Version>
   <Author>Dac Chartrand [dac.chartrand@gmail.com]</Author>
   <Name>ChordSlop</Name>
-  <Category>Pattern Editor</Category>
+  <Category>Pattern, MIDI</Category>
   <Description>Chord pads and a circle of fifths: play chords by mouse, MIDI or QWERTY and record them into the pattern.</Description>
   <Platform>Windows, Mac, Linux</Platform>
   <License>MIT</License>

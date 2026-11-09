@@ -13,9 +13,9 @@ to a key.
 Twelve major chords around the outside, their relative minors inside. Walk
 clockwise and each chord is a fifth up from the last: C, G, D, A. Neighbours
 share two of their three notes, so moving between them sounds smooth; jump
-across the circle and it sounds like a jump. The
-shaded wedge covers the seven chords that live in the current key, and the
-key itself sits at the top. Change the key and the whole thing turns.
+across the circle and it sounds like a jump. The shaded wedge covers the seven
+chords that live in the current key, and the key itself sits at the top.
+Change the key and the whole thing turns.
 
 So the circle is a map. Green is home. Next door is a safe step. Far side is
 drama. Click any chord to hear it, click the centre for the tonic, and while a

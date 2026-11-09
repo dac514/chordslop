@@ -36,7 +36,8 @@ if not renoise.tool().preferences then
     mode = 0,
     degrees = { 0 },
     accidentals = { 0 },
-    types = { 0 },
+    types = { 0 }, -- 0 = the diatonic chord of the degree
+    sevenths = { 0 }, -- 1 = that diatonic chord as a seventh
     inversions = { 0 },
     octaves = { 0 },
   }
@@ -62,6 +63,8 @@ if not renoise.tool().preferences then
     pad_types = sixteen(0), -- 0 = empty pad; first run loads the first factory preset
     pad_inversions = sixteen(0),
     pad_octaves = sixteen(4),
+    preset_name = "", -- the preset the pads came from ("" = none)
+    preset_dirty = false, -- the pads have been edited since that preset was loaded
     presets = renoise.Document.DocumentList(),
   }
 end

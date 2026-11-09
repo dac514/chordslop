@@ -111,4 +111,54 @@ local low = presets.capture_pad({ root = 0, type = 1, inversion = 2, octave = 3 
 t.eq(low and low.o, -1, "octave offset captured")
 t.eq(low and low.i, 2, "inversion captured")
 
+-- capture writes diatonic chords as degrees, so they adapt to another mode
+t.eq(captured.pads[1] and captured.pads[1].s, true, "diatonic seventh captured as s")
+t.eq(captured.pads[1] and captured.pads[1].t, nil, "no fixed type for a diatonic seventh")
+t.eq(captured.pads[4] and captured.pads[4].t, "6", "a sixth chord keeps its type")
+t.eq(
+  names({ presets.render(captured, 2, theory.MODE_AEOLIAN)[1] }, 2, 6),
+  "Em7b5",
+  "captured ii adapts to minor"
+)
+local triads = presets.capture(presets.render(presets.FACTORY[1], 0, 1), 0, 1, "tri")
+t.eq(triads.pads[2] and triads.pads[2].t, nil, "diatonic triad captured without type")
+t.eq(triads.pads[2] and triads.pads[2].s, nil, "diatonic triad captured without s")
+t.eq(triads.pads[8], false, "empty pad stays empty")
+
+-- remode: a preset on the grid follows the mode
+local jazz = find "Jazz"
+local c_major = presets.render(jazz, 0, 1)
+local c_minor = presets.remode(jazz, c_major, 0, 1, theory.MODE_AEOLIAN)
+t.eq(
+  names(c_minor, 0, theory.MODE_AEOLIAN),
+  "Dm7b5 Gm7 Cm7 C6 Ebmaj7 Abmaj7 Dm7b5 Gm7 Fm7 Bb7 Ebmaj7 Abmaj7 Dm7b5 Gm7 Cm7 Abmaj7",
+  "jazz preset re-rendered in C Aeolian"
+)
+local green = 0
+for _, pad in ipairs(c_minor) do
+  local _, _, func = pads_mod.label(pad, 0, theory.MODE_AEOLIAN)
+  if func == "in_key" then
+    green = green + 1
+  end
+end
+t.eq(green, 15, "fifteen of sixteen jazz pads are in key in Aeolian (C6 is not)")
+t.eq(c_minor[13].inversion, 1, "inversions survive remode")
+
+-- remode keeps the register the pads have after a key transposition
+local b_major = pads_mod.transpose(c_major, -1) -- C -> B, shortest route
+t.eq(b_major[3].octave, 3, "transposing down carries the tonic chord to octave 3")
+local b_minor = presets.remode(jazz, b_major, 11, 1, theory.MODE_AEOLIAN)
+t.eq(b_minor[3].root, 11, "tonic stays on B")
+t.eq(b_minor[3].octave, 3, "tonic keeps its octave")
+t.eq(names({ b_minor[3] }, 11, theory.MODE_AEOLIAN), "Bm7", "tonic becomes minor seventh")
+t.eq(b_minor[1].octave, 4, "ii keeps its octave")
+
+-- remode moves a root by the shortest route when the degree wraps across C
+local cs_major = presets.render(presets.FACTORY[1], 1, 1) -- C# major: degree 7 is C (B#)
+t.eq(cs_major[7].root, 0, "degree 7 of C# major is C")
+local cs_minor = presets.remode(presets.FACTORY[1], cs_major, 1, 1, theory.MODE_AEOLIAN)
+t.eq(cs_minor[7].root, 11, "degree 7 of C# minor is B")
+t.eq(cs_minor[7].octave, cs_major[7].octave - 1, "B sits a semitone below the C it replaces")
+t.eq(cs_minor[8].type, 0, "empty slots stay empty")
+
 t.done()

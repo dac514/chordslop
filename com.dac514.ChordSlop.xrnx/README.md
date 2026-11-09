@@ -41,9 +41,12 @@ turnarounds, bossa, gospel, lo-fi, four flavours of minor, Dorian, Phrygian,
 Lydian, Mixolydian, power chords, ambient sus pads. Every one of them stays in
 the key, so whatever you pick, nothing on the grid is a wrong note. They are
 written as scale degrees, so they follow the key, and most set the mode they
-were made for. Hover the list for a one-line description. *Save* keeps your
-own layout under a name, also relative to the key, so it transposes like the
-rest. *Delete* removes it again.
+were made for. Change the mode afterwards and the preset is re-rendered in it:
+the jazz ii V I becomes a minor ii V i. Hover the list for a one-line
+description. Once you edit a pad the list shows the preset's name with an
+asterisk; pick it again to get it back. *Save* keeps your own layout under a
+name, also relative to the key and mode, so it transposes and re-renders like
+the rest. *Delete* removes it again.
 
 ## Playing
 

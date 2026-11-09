@@ -562,8 +562,47 @@ function M.render(preset, key, mode, base_octave)
   return pads
 end
 
+---Re-render a preset into another mode while keeping each pad's register.
+---`pads` are the preset as it is on the grid now (rendered in `from_mode`,
+---possibly transposed since). Every pad gets the chord of `to_mode`; its root
+---moves by the shortest route from the old one (a mode change shifts a degree
+---by a semitone or two), so the octave carries like `pads.transpose`.
+---@param preset Preset
+---@param pads Pad[]
+---@param key integer 0-11
+---@param from_mode integer 1-7
+---@param to_mode integer 1-7
+---@param base_octave integer? Default pads_mod.DEFAULT_OCTAVE.
+---@return Pad[]
+function M.remode(preset, pads, key, from_mode, to_mode, base_octave)
+  local before = M.render(preset, key, from_mode, base_octave)
+  local after = M.render(preset, key, to_mode, base_octave)
+  local out = {}
+  for i = 1, pads_mod.COUNT do
+    local pad = pads[i] or pads_mod.empty()
+    if pads_mod.is_empty(after[i]) or pads_mod.is_empty(pad) then
+      out[i] = pads_mod.normalize(after[i])
+    else
+      local delta = ((after[i].root - before[i].root + 6) % 12) - 6
+      local absolute = pad.octave * 12 + pad.root + delta
+      out[i] = pads_mod.normalize {
+        root = absolute % 12,
+        type = after[i].type,
+        inversion = after[i].inversion,
+        octave = math.max(
+          pads_mod.MIN_OCTAVE,
+          math.min(pads_mod.MAX_OCTAVE, math.floor(absolute / 12))
+        ),
+      }
+    end
+  end
+  return out
+end
+
 ---Write one pad as a spec relative to a key/mode. Roots outside the scale
----are spelled as the flattened upper degree (bVII, bIII, ...).
+---are spelled as the flattened upper degree (bVII, bIII, ...). A chord that
+---is the diatonic triad or seventh of its degree is written as such (no `t`),
+---so the preset adapts when it is rendered into another mode.
 ---@param pad Pad
 ---@param key integer
 ---@param mode integer
@@ -587,6 +626,15 @@ function M.capture_pad(pad, key, mode)
   local spec = { d = degree, t = theory.CHORD_TYPES[pad.type].id }
   if acc ~= 0 then
     spec.a = acc
+  else
+    local _, triad = theory.diatonic_chord(key, mode, degree, false)
+    local _, seventh = theory.diatonic_chord(key, mode, degree, true)
+    if pad.type == triad then
+      spec.t = nil
+    elseif pad.type == seventh then
+      spec.t = nil
+      spec.s = true
+    end
   end
   if pad.inversion ~= 0 then
     spec.i = pad.inversion

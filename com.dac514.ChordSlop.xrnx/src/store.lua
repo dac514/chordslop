@@ -4,8 +4,8 @@
   list layout.
 
   User presets are stored relative to a key, as degree/accidental/type/
-  inversion/octave-offset lists plus the mode (see `src/presets.lua`), so
-  they render into whatever key is current, like the factory presets.
+  seventh/inversion/octave-offset lists plus the mode (see `src/presets.lua`),
+  so they render into whatever key and mode is current, like the factory ones.
 ]]
 
 local pads_mod = require "src.pads"
@@ -20,7 +20,8 @@ M.PRESET_MODEL = "ChordSlopPreset"
 ---@field mode renoise.Document.ObservableNumber
 ---@field degrees renoise.Document.ObservableNumberList 0 = empty pad
 ---@field accidentals renoise.Document.ObservableNumberList
----@field types renoise.Document.ObservableNumberList Chord type index.
+---@field types renoise.Document.ObservableNumberList Chord type index; 0 = diatonic.
+---@field sevenths renoise.Document.ObservableNumberList 1 = diatonic seventh (when type is 0).
 ---@field inversions renoise.Document.ObservableNumberList
 ---@field octaves renoise.Document.ObservableNumberList Octave offsets.
 
@@ -106,22 +107,25 @@ function M.save_user_preset(prefs, preset)
   local entry = prefs.presets:property(index) --[[@as ChordSlopPresetNode]]
   entry.name.value = preset.name
   entry.mode.value = preset.mode or 0
-  local degrees, accidentals, types, inversions, octaves = {}, {}, {}, {}, {}
+  local degrees, accidentals, types, sevenths, inversions, octaves = {}, {}, {}, {}, {}, {}
   for i = 1, pads_mod.COUNT do
     local spec = preset.pads[i]
     if spec then
       degrees[i] = spec.d
       accidentals[i] = spec.a or 0
-      types[i] = theory.type_index(spec.t or "maj") or 1
+      types[i] = spec.t and (theory.type_index(spec.t) or 1) or 0
+      sevenths[i] = spec.s and 1 or 0
       inversions[i] = spec.i or 0
       octaves[i] = spec.o or 0
     else
-      degrees[i], accidentals[i], types[i], inversions[i], octaves[i] = 0, 0, 0, 0, 0
+      degrees[i], accidentals[i], types[i], sevenths[i], inversions[i], octaves[i] =
+        0, 0, 0, 0, 0, 0
     end
   end
   write(entry.degrees, degrees)
   write(entry.accidentals, accidentals)
   write(entry.types, types)
+  write(entry.sevenths, sevenths)
   write(entry.inversions, inversions)
   write(entry.octaves, octaves)
   return index
@@ -135,14 +139,20 @@ function M.load_user_preset(prefs, index)
   local degrees = read(entry.degrees)
   local accidentals = read(entry.accidentals)
   local types = read(entry.types)
+  local sevenths = read(entry.sevenths)
   local inversions = read(entry.inversions)
   local octaves = read(entry.octaves)
   local specs = {}
   for i = 1, pads_mod.COUNT do
     local d = degrees[i] or 0
     local chord = theory.CHORD_TYPES[types[i] or 0]
-    if d >= 1 and d <= 7 and chord then
-      local spec = { d = d, t = chord.id }
+    if d >= 1 and d <= 7 then
+      local spec = { d = d }
+      if chord then
+        spec.t = chord.id
+      elseif (sevenths[i] or 0) == 1 then
+        spec.s = true
+      end
       if (accidentals[i] or 0) ~= 0 then
         spec.a = accidentals[i]
       end

@@ -30,6 +30,7 @@ local GRID_COLS, GRID_ROWS = 4, 4
 local GRID_W = GRID_COLS * PAD_W + (GRID_COLS - 1) * PAD_GAP
 local LABEL_H = renoise.ViewBuilder.DEFAULT_CONTROL_HEIGHT
 local CIRCLE_SIZE = 400
+local CIRCLE_W = CIRCLE_SIZE + 2 * renoise.ViewBuilder.DEFAULT_DIALOG_SPACING -- circle_panel incl. margin
 
 ---Held-note slots for things that are not pads (ring and centre buttons).
 local HELD_OUTER, HELD_INNER, HELD_CENTER = 100, 200, 300
@@ -41,13 +42,15 @@ local HELD_OUTER, HELD_INNER, HELD_CENTER = 100, 200, 300
 ---@field mode integer 1-7.
 ---@field learn_armed boolean Next MIDI note-on sets the base note.
 ---@field circle_mode integer 1 = play, 2 = assign to the selected pad.
+---@field preset_name string? The preset the pads came from; nil when unknown.
+---@field dirty boolean The pads were edited since that preset was loaded.
 ---@field press fun(index: integer, velocity: integer?, from_midi: boolean?)
 ---@field release fun(index: integer)
 ---@field learned fun(note: integer)
 ---@field refresh_all fun()
----@field load_preset fun(index: integer) Popup index: factory first, then user presets.
+---@field load_preset fun(index: integer) Preset index: factory first, then user presets.
 ---@field save_preset fun(name: string)
----@field delete_preset fun(index: integer)
+---@field delete_preset fun() Delete the preset the pads came from (user presets only).
 ---@field destroy fun()
 
 ---Key popup labels: both spellings so every key reads naturally.
@@ -57,9 +60,11 @@ local KEY_ITEMS =
 local TIP_KEY = "Key: the root note everything is measured from. "
   .. "Changing it turns the circle and, with Transpose pads on, moves every pad along."
 local TIP_MODE = "Mode: the scale built on the key (major, minor, Dorian...). "
-  .. "It decides which chords count as in key (green), how the circle is shaded and how presets are spelled."
+  .. "It decides which chords count as in key (green) and how the circle is shaded. "
+  .. "A preset you picked and have not edited is re-rendered in the new mode."
 local TIP_PRESET_BASE = "Presets are ready-made layouts of 16 chords; pick one and it lands on the pads. "
-  .. "Factory presets are written as scale degrees and render into the current key; so do the ones you save."
+  .. "Factory presets are written as scale degrees and render into the current key and mode; so do the ones you save. "
+  .. "An asterisk after the name means the pads were edited since; pick the preset again to get it back."
 local TIP_MIDI_BASE = "The lowest MIDI note of the controller pads; the 16 pads answer to this note and the "
   .. "15 above it, arranged by the layout next to it. Default C-3 (note 36) is pad 1 of bank A on an AKAI "
   .. "MPK mini. Or press Learn and hit that pad."
@@ -154,10 +159,14 @@ function M.build(app, palette)
     mode = prefs.mode.value,
     learn_armed = false,
     circle_mode = 1,
+    preset_name = prefs.preset_name.value ~= "" and prefs.preset_name.value or nil,
+    dirty = prefs.preset_dirty.value,
   }
   if pads_mod.all_empty(ctl.pads) then
     ctl.pads = presets.render(presets.FACTORY[1], ctl.key, ctl.mode)
     store.save_pads(prefs, ctl.pads)
+    ctl.preset_name, ctl.dirty = presets.FACTORY[1].name, false
+    prefs.preset_name.value, prefs.preset_dirty.value = ctl.preset_name, false
   end
   ---@type table<integer, boolean> pads currently sounding
   local active = {}
@@ -190,6 +199,8 @@ function M.build(app, palette)
   local syncing = false -- true while the code (not the user) sets control values
   ---@type fun()
   local refresh_circle
+  ---@type fun() The pads no longer are the preset they came from (defined with the presets).
+  local mark_dirty
 
   local function flats()
     return theory.prefers_flats(ctl.key, ctl.mode)
@@ -332,6 +343,7 @@ function M.build(app, palette)
     update(ctl.pads[ctl.selected])
     ctl.pads[ctl.selected] = pads_mod.normalize(ctl.pads[ctl.selected])
     save_pads()
+    mark_dirty()
     refresh_pad(ctl.selected)
     refresh_editor()
   end
@@ -361,6 +373,8 @@ function M.build(app, palette)
     if prefs.transpose_pads.value then
       ctl.pads = pads_mod.transpose(ctl.pads, delta)
       save_pads()
+    else
+      mark_dirty() -- the pads are no longer the preset rendered in this key
     end
     ctl.key = new_key
     prefs.root_key.value = new_key
@@ -423,8 +437,10 @@ function M.build(app, palette)
   -- Presets --------------------------------------------------------------------
 
   local PRESET_SEPARATOR = "----"
+  local PRESET_NONE = "(unsaved)"
   local factory_count = #presets.FACTORY
 
+  ---Every preset by name: factory first, then the user's own after a separator.
   ---@return string[]
   local function preset_items()
     local items = presets.names()
@@ -438,7 +454,7 @@ function M.build(app, palette)
     return items
   end
 
-  ---Popup index -> user preset index, or nil for factory entries and the separator.
+  ---Preset index -> user preset index, or nil for factory entries and the separator.
   ---@param index integer
   ---@return integer?
   local function user_index(index)
@@ -449,7 +465,7 @@ function M.build(app, palette)
     return nil
   end
 
-  ---The preset behind a popup index, if any.
+  ---The preset behind a preset index, if any.
   ---@param index integer
   ---@return Preset?
   local function preset_at(index)
@@ -463,17 +479,43 @@ function M.build(app, palette)
     return nil
   end
 
-  ---@param select integer? Popup index to select afterwards.
-  local function refresh_presets(select)
+  ---Preset index of a name (factory wins on a clash), or nil.
+  ---@param name string?
+  ---@return integer?
+  local function find_preset(name)
+    if not name then
+      return nil
+    end
+    for i, item in ipairs(preset_items()) do
+      if item == name then
+        return i
+      end
+    end
+    return nil
+  end
+
+  ---Is the status entry ("<name> *" or "(unsaved)") at the top of the popup?
+  ---@return integer 1 when it is, else 0
+  local function popup_offset()
+    return (ctl.dirty or not find_preset(ctl.preset_name)) and 1 or 0
+  end
+
+  ---Rebuild the popup: the origin preset selected, or a status entry on top when
+  ---the pads drifted from it ("<name> *") or came from nowhere ("(unsaved)").
+  local function refresh_presets()
     local popup = vb.views.preset --[[@as renoise.Views.Popup]]
     local items = preset_items()
+    local origin = find_preset(ctl.preset_name)
+    local value = origin
+    if ctl.dirty or not origin then
+      table.insert(items, 1, origin and (ctl.preset_name .. " *") or PRESET_NONE)
+      value = 1
+    end
     syncing = true
     popup.items = items
-    if select and select >= 1 and select <= #items then
-      popup.value = select
-    end
+    popup.value = value --[[@as integer]]
     syncing = false
-    local preset = preset_at(popup.value)
+    local preset = origin and preset_at(origin) or nil
     local tip = TIP_PRESET_BASE
     if preset then
       tip = ("%s\n\n%s%s"):format(
@@ -488,12 +530,50 @@ function M.build(app, palette)
     end
     popup.tooltip = tip
     local del = vb.views.preset_delete --[[@as renoise.Views.Button]]
-    del.active = user_index(popup.value) ~= nil
+    del.active = origin ~= nil and user_index(origin) ~= nil
+  end
+
+  ---Remember where the pads came from and whether they still are that.
+  ---@param name string?
+  ---@param dirty boolean
+  local function set_origin(name, dirty)
+    ctl.preset_name, ctl.dirty = name, dirty
+    prefs.preset_name.value = name or ""
+    prefs.preset_dirty.value = dirty
+    refresh_presets()
+  end
+
+  mark_dirty = function()
+    if ctl.preset_name and not ctl.dirty then
+      set_origin(ctl.preset_name, true)
+    end
+  end
+
+  ---The preset the pads came from, if it still exists.
+  ---@return Preset?
+  local function origin_preset()
+    local index = find_preset(ctl.preset_name)
+    return index and preset_at(index) or nil
+  end
+
+  ---Mode change from the user: an unedited preset is re-rendered in the new mode.
+  ---@param new_mode integer 1-7
+  local function change_mode(new_mode)
+    if new_mode == ctl.mode then
+      return
+    end
+    local preset = not ctl.dirty and origin_preset() or nil
+    if preset then
+      ctl.pads = presets.remode(preset, ctl.pads, ctl.key, ctl.mode, new_mode)
+      save_pads()
+    end
+    set_mode(new_mode)
   end
 
   function ctl.load_preset(index)
     local preset = preset_at(index)
     if not preset then
+      refresh_presets() -- the separator: snap the popup back
       return
     end
     if preset.mode and preset.mode ~= ctl.mode then
@@ -502,6 +582,7 @@ function M.build(app, palette)
     ctl.pads = presets.render(preset, ctl.key, ctl.mode)
     save_pads()
     ctl.selected = 1
+    set_origin(preset.name, false)
     ctl.refresh_all()
     animate_circle()
     renoise.app():show_status(("ChordSlop: %s. %s"):format(preset.name, preset.desc or ""))
@@ -512,8 +593,8 @@ function M.build(app, palette)
     if name == "" then
       name = ("Preset %d"):format(#store.user_preset_names(prefs) + 1)
     end
-    local u = store.save_user_preset(prefs, presets.capture(ctl.pads, ctl.key, ctl.mode, name))
-    refresh_presets(factory_count + 1 + u)
+    store.save_user_preset(prefs, presets.capture(ctl.pads, ctl.key, ctl.mode, name))
+    set_origin(name, false)
     renoise.app():show_status(
       ("ChordSlop: saved %s (relative to %s %s)"):format(
         name,
@@ -523,13 +604,14 @@ function M.build(app, palette)
     )
   end
 
-  function ctl.delete_preset(index)
-    local u = user_index(index)
+  function ctl.delete_preset()
+    local origin = find_preset(ctl.preset_name)
+    local u = origin and user_index(origin)
     if not u then
       return
     end
     store.delete_user_preset(prefs, u)
-    refresh_presets(1)
+    set_origin(nil, false)
   end
 
   -- Circle of fifths -------------------------------------------------------------
@@ -615,6 +697,7 @@ function M.build(app, palette)
     if ctl.circle_mode == 2 then
       ctl.pads[ctl.selected] = pad
       save_pads()
+      mark_dirty()
       refresh_pad(ctl.selected)
       refresh_editor()
     end
@@ -784,10 +867,14 @@ function M.build(app, palette)
     grid:add_view(r)
   end
 
-  local header = vb:horizontal_aligner {
+  -- Two halves as wide as the panels below, so the controls line up with them.
+  local header = vb:row {
     id = "header",
-    mode = "justify",
-    vb:row {
+    spacing = PANEL_GAP,
+    vb:horizontal_aligner { -- a plain row shrinks to its content; an aligner keeps its width
+      id = "header_left",
+      mode = "left",
+      width = CIRCLE_W,
       spacing = SPACING,
       vb:text { text = "Key", style = "disabled", tooltip = TIP_KEY },
       vb:popup {
@@ -810,7 +897,7 @@ function M.build(app, palette)
         tooltip = TIP_MODE,
         notifier = app.guard(function(value)
           if not syncing then
-            set_mode(value)
+            change_mode(value)
           end
         end),
       },
@@ -821,44 +908,49 @@ function M.build(app, palette)
         tooltip = "On: changing the key moves every pad with it. Off: the pads stay and only their numerals and colours follow the key.",
       },
     },
-    vb:row {
-      spacing = SPACING,
-      vb:text { text = "Preset", style = "disabled", tooltip = TIP_PRESET_BASE },
-      vb:popup {
-        id = "preset",
-        width = 200,
-        items = preset_items(),
-        tooltip = TIP_PRESET_BASE,
-        notifier = app.guard(function(value)
-          if not syncing then
-            refresh_presets()
-            ctl.load_preset(value)
-          end
-        end),
+    vb:horizontal_aligner {
+      id = "header_right",
+      mode = "justify",
+      width = GRID_W,
+      vb:row {
+        spacing = SPACING,
+        vb:text { text = "Preset", style = "disabled", tooltip = TIP_PRESET_BASE },
+        vb:popup {
+          id = "preset",
+          width = 200,
+          items = preset_items(),
+          tooltip = TIP_PRESET_BASE,
+          notifier = app.guard(function(value)
+            if not syncing then
+              ctl.load_preset(value - popup_offset())
+            end
+          end),
+        },
       },
-      vb:space { width = GAP },
-      vb:textfield {
-        id = "preset_name",
-        width = 120,
-        tooltip = "Name for saving the current pads as your own preset",
-      },
-      vb:button {
-        id = "preset_save",
-        text = "Save",
-        tooltip = "Save the current pads as a preset of yours. It is stored relative to the key, so it follows key changes like the factory ones.",
-        notifier = app.guard(function()
-          local field = vb.views.preset_name --[[@as renoise.Views.TextField]]
-          ctl.save_preset(field.value)
-        end),
-      },
-      vb:button {
-        id = "preset_delete",
-        text = "Delete",
-        tooltip = "Delete the chosen preset of yours (factory presets cannot be deleted)",
-        notifier = app.guard(function()
-          local popup = vb.views.preset --[[@as renoise.Views.Popup]]
-          ctl.delete_preset(popup.value)
-        end),
+      vb:row {
+        spacing = SPACING,
+        vb:textfield {
+          id = "preset_name",
+          width = 120,
+          tooltip = "Name for saving the current pads as your own preset",
+        },
+        vb:button {
+          id = "preset_save",
+          text = "Save",
+          tooltip = "Save the current pads as a preset of yours. It is stored relative to the key, so it follows key changes like the factory ones.",
+          notifier = app.guard(function()
+            local field = vb.views.preset_name --[[@as renoise.Views.TextField]]
+            ctl.save_preset(field.value)
+          end),
+        },
+        vb:button {
+          id = "preset_delete",
+          text = "Delete",
+          tooltip = "Delete the chosen preset of yours (factory presets cannot be deleted)",
+          notifier = app.guard(function()
+            ctl.delete_preset()
+          end),
+        },
       },
     },
   }
@@ -1090,7 +1182,7 @@ function M.build(app, palette)
 
   refresh_midi_popup()
   refresh_learn()
-  refresh_presets(1)
+  refresh_presets()
   ctl.refresh_all()
   anim.init(app, app.guard(apply_angles), rotation, wedge)
   return vb, root, ctl --[[@as UiController]]

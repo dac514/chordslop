@@ -181,20 +181,22 @@ function M.build(app, palette)
     if pads_mod.is_empty(pad) then
       return nil
     end
-    local ring, k = circle.ring_for_pad(pad)
+    local ring, k = circle.ring_for_pad(pad, ctl.key, ctl.mode)
     return ("%s_%d"):format(ring, k)
   end
 
-  ---Is a ring button lit because a pad holding its chord is pressed?
+  ---Is a ring button lit because a pad holding its chord is pressed? Returns
+  ---that pad's level, which can be lower than the button's own (D5 lights the
+  ---D° button in C minor but changes a note), so the lit button shows it.
   ---@param ring_key string
-  ---@return boolean
+  ---@return CircleLevel? level nil when no pressed pad lights the button
   local function ring_lit_by_pads(ring_key)
     for i, pad in ipairs(ctl.pads) do
       if active[i] and ring_key_of(pad) == ring_key then
-        return true
+        return circle.pad_level(pad, ctl.key, ctl.mode)
       end
     end
-    return false
+    return nil
   end
   local syncing = false -- true while the code (not the user) sets control values
   ---@type fun()
@@ -211,10 +213,11 @@ function M.build(app, palette)
   ---@param i integer
   local function refresh_pad(i)
     local pad = ctl.pads[i]
-    local name, numeral, func = pads_mod.label(pad, ctl.key, ctl.mode)
+    local name, numeral = pads_mod.label(pad, ctl.key, ctl.mode)
     local button = vb.views["pad_" .. i] --[[@as renoise.Views.Button]]
     local label = vb.views["num_" .. i] --[[@as renoise.Views.Text]]
-    local color = colors.for_function(palette, func)
+    local level = pads_mod.is_empty(pad) and "empty" or circle.pad_level(pad, ctl.key, ctl.mode)
+    local color = colors.for_level(palette, level)
     local lit_by_ring = ring_active[ring_key_of(pad) or ""]
     if active[i] or i == ctl.selected or lit_by_ring then
       color = palette.highlight(color)
@@ -316,7 +319,7 @@ function M.build(app, palette)
   local function refresh_ring_for_pad(i)
     local pad = ctl.pads[i]
     if refresh_ring and not pads_mod.is_empty(pad) then
-      local ring, k = circle.ring_for_pad(pad)
+      local ring, k = circle.ring_for_pad(pad, ctl.key, ctl.mode)
       refresh_ring(k, ring)
     end
   end
@@ -353,7 +356,7 @@ function M.build(app, palette)
   ---Turn the circle (labels and wedge) to the current key and mode.
   local function animate_circle()
     anim.go(
-      circle.target_rotation(ctl.key),
+      circle.target_rotation(ctl.key, ctl.mode),
       circle.wedge_deg(ctl.key, ctl.mode),
       prefs.animate.value
     )
@@ -423,7 +426,7 @@ function M.build(app, palette)
   local function refresh_learn()
     local button = vb.views.learn --[[@as renoise.Views.Button]]
     button.text = ctl.learn_armed and "Hit pad 1..." or "Learn"
-    button.color = ctl.learn_armed and palette.borrowed or { 0, 0, 0 }
+    button.color = ctl.learn_armed and palette.learn or { 0, 0, 0 }
   end
 
   function ctl.learned(note)
@@ -617,7 +620,7 @@ function M.build(app, palette)
   -- Circle of fifths -------------------------------------------------------------
 
   local layout = circle.layout(CIRCLE_SIZE)
-  local rotation = circle.target_rotation(ctl.key)
+  local rotation = circle.target_rotation(ctl.key, ctl.mode)
   local wedge = circle.wedge_deg(ctl.key, ctl.mode)
   local ring_outer, ring_inner = circle.ring_chords(ctl.key, ctl.mode)
 
@@ -631,19 +634,36 @@ function M.build(app, palette)
     ctx:begin_path()
     ctx:arc(0, 0, L.r_edge, 0, 2 * math.pi)
     ctx:fill()
-    -- in-key wedge
-    local a0, a1 = circle.wedge_arc_deg(wedge)
-    local c = palette.in_key
-    ctx.fill_color = { c[1], c[2], c[3], 96 }
-    ctx:begin_path()
-    ctx:move_to(0, 0)
-    ctx:arc(0, 0, L.r_edge, math.rad(a0 - 90), math.rad(a1 - 90))
-    ctx:close_path()
-    ctx:fill()
+    -- home and next-door slots, relative to the (animated) first home column
+    local r_mid = (L.r_outer + L.r_inner) / 2
+    local fills = {
+      home = { palette.home[1], palette.home[2], palette.home[3], 96 },
+      near = { palette.near[1], palette.near[2], palette.near[3], 72 },
+    }
+    for rel = 0, circle.POSITIONS - 1 do
+      for _, ring in ipairs { "outer", "inner" } do
+        local fill = fills[circle.slot_level(rel, ring, ctl.mode)]
+        if fill then
+          local mid = wedge + rel * circle.STEP_DEG - 90
+          local a0 = math.rad(mid - circle.STEP_DEG / 2)
+          local a1 = math.rad(mid + circle.STEP_DEG / 2)
+          local r_out, r_in = L.r_edge, r_mid
+          if ring == "inner" then
+            r_out, r_in = r_mid, L.r_hole
+          end
+          ctx.fill_color = fill
+          ctx:begin_path()
+          ctx:arc(0, 0, r_out, a0, a1)
+          ctx:arc(0, 0, r_in, a1, a0, true)
+          ctx:close_path()
+          ctx:fill()
+        end
+      end
+    end
     -- ring separators and spokes
     ctx.stroke_color = { 255, 255, 255, 28 }
     ctx.line_width = 1
-    for _, r in ipairs { L.r_edge - 1, (L.r_outer + L.r_inner) / 2 } do
+    for _, r in ipairs { L.r_edge - 1, r_mid } do
       ctx:begin_path()
       ctx:arc(0, 0, r, 0, 2 * math.pi)
       ctx:stroke()
@@ -662,7 +682,7 @@ function M.build(app, palette)
     ctx:fill()
     -- tonic marker, fixed at 12 o'clock
     ctx:set_transform(1, 0, 0, 1, 0, 0)
-    ctx.fill_color = palette.in_key
+    ctx.fill_color = palette.home
     ctx:begin_path()
     ctx:move_to(L.cx - 8, 0)
     ctx:line_to(L.cx + 8, 0)
@@ -746,13 +766,19 @@ function M.build(app, palette)
     local chord = (ring == "outer") and ring_outer[k + 1] or ring_inner[k + 1]
     local button = vb.views[("ring_%s_%d"):format(ring, k)] --[[@as renoise.Views.Button]]
     local ring_key = ("%s_%d"):format(ring, k)
-    local color = chord.in_key and palette.in_key or { 0, 0, 0 }
-    if ring_active[ring_key] or ring_lit_by_pads(ring_key) then
+    local pad_level = ring_lit_by_pads(ring_key)
+    local color = colors.for_level(palette, pad_level or chord.level)
+    if ring_active[ring_key] or pad_level then
       color = palette.highlight(color)
     end
+    local tonic_ring, tonic_k = circle.tonic_slot(ctl.key, ctl.mode)
+    local tonic = tonic_ring == ring and tonic_k == k
     button.text = ring_label(chord)
     button.color = color
-    button.tooltip = chord.numeral and ("%s in this key"):format(chord.numeral) or "Outside the key"
+    -- only the tonic chord is bold, so it stands out under the marker
+    button.font = tonic and "bold" or "normal"
+    button.tooltip = tonic and ("%s Tonic chord of the key."):format(circle.ring_tooltip(chord))
+      or circle.ring_tooltip(chord)
   end
 
   function refresh_circle()
@@ -767,6 +793,27 @@ function M.build(app, palette)
       theory.note_name(ctl.key, use_flats),
       theory.MODES[ctl.mode].short
     )
+    local notes = {}
+    for i, pc in ipairs(theory.scale(ctl.key, ctl.mode)) do
+      notes[i] = theory.note_name(pc, use_flats)
+    end
+    local lines = {
+      ("%s %s. Press to hear the tonic chord."):format(
+        theory.note_name(ctl.key, use_flats),
+        theory.MODES[ctl.mode].name
+      ),
+      ("Notes of the key: %s."):format(table.concat(notes, " ")),
+      "Green is home: the seven chords of the key, in three columns plus the diminished chord.",
+      "Blue is next door: one column further, each chord changes one note.",
+      "Gray is far from home.",
+    }
+    if ctl.mode == theory.MODE_AEOLIAN then
+      local dominant = (ctl.key + 7) % 12
+      lines[#lines + 1] = ("In minor, %s major is home too: the usual dominant."):format(
+        theory.note_name(dominant, use_flats)
+      )
+    end
+    center.tooltip = table.concat(lines, "\n")
     local canvas = vb.views.wheel --[[@as renoise.Views.Canvas]]
     canvas:update()
   end
@@ -793,7 +840,6 @@ function M.build(app, palette)
           height = outer and layout.btn_h or layout.btn_h_inner,
         },
         style = "rounded",
-        font = outer and "bold" or "normal",
         pressed = app.guard(function()
           ring_pressed(k, ring)
         end),
@@ -809,7 +855,6 @@ function M.build(app, palette)
     size = { width = layout.center_w, height = layout.center_h },
     style = "rounded",
     font = "bold",
-    tooltip = "The key: press to hear the tonic chord",
     pressed = app.guard(function()
       player.press(HELD_CENTER, tonic_pad(), nil, false)
     end),

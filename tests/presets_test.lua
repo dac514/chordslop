@@ -2,6 +2,7 @@ local t = require "tests.helper"
 local presets = require "src.presets"
 local pads_mod = require "src.pads"
 local theory = require "src.theory"
+local circle = require "src.circle"
 
 local function names(pads, key, mode)
   local out = {}
@@ -27,14 +28,16 @@ for _, preset in ipairs(presets.FACTORY) do
       for i, pad in ipairs(rendered) do
         if not pads_mod.is_empty(pad) then
           local name, numeral, func = pads_mod.label(pad, key, mode)
+          local level = circle.pad_level(pad, key, mode)
           t.check(
-            func == "in_key",
-            ("%s pad %d (%s %s) is %s in key %d mode %d"):format(
+            func == "in_key" and level == "home",
+            ("%s pad %d (%s %s) is %s/%s in key %d mode %d"):format(
               preset.name,
               i,
               name,
               numeral,
               func,
+              level,
               key,
               mode
             )

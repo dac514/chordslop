@@ -27,9 +27,14 @@ t.check(inner.y > o.y, "inner ring sits closer to the centre")
 local c = circle.center_origin(L)
 t.eq(c.x, math.floor(L.cx - L.center_w / 2 + 0.5), "center x")
 
-t.eq(circle.target_rotation(0), 0, "C needs no rotation")
-t.eq(circle.target_rotation(7), -30, "G rotates one step counter-clockwise")
-t.eq(circle.target_rotation(5), -330, "F rotates eleven steps")
+t.eq(circle.target_rotation(0, 1), 0, "C major needs no rotation")
+t.eq(circle.target_rotation(7, 1), -30, "G major rotates one step counter-clockwise")
+t.eq(circle.target_rotation(5, 1), -330, "F major rotates eleven steps")
+t.eq(circle.target_rotation(9, 6), 0, "A minor sits under C, at the top")
+t.eq(circle.target_rotation(0, 6), -270, "C minor sits under Eb")
+t.eq(circle.target_rotation(0, 2), -270, "C Dorian: Cm sits under Eb")
+local tr, tk = circle.tonic_slot(0, 7)
+t.eq(tr .. tk, "inner9", "C Locrian: C dim sits on the inner ring under Eb")
 
 t.eq(circle.shortest_delta(350, 10), 20, "delta wraps forward")
 t.eq(circle.shortest_delta(10, 350), -20, "delta wraps backward")
@@ -66,18 +71,73 @@ local w0, w1 = circle.wedge_arc_deg(90)
 t.eq(w0, 75, "wedge arc start from a free angle")
 t.eq(w1, 285, "wedge arc end from a free angle")
 
+-- Levels of the ring slots, counted in columns from the first home column.
+t.eq(circle.slot_level(0, "outer", 1), "home", "first home column")
+t.eq(circle.slot_level(2, "outer", 1), "home", "third home column")
+t.eq(circle.slot_level(3, "inner", 1), "home", "diminished slot is home")
+t.eq(circle.slot_level(3, "outer", 1), "near", "column after the window is near")
+t.eq(circle.slot_level(11, "outer", 1), "near", "column before the window is near (outer)")
+t.eq(circle.slot_level(11, "inner", 1), "near", "column before the window is near (inner)")
+t.eq(circle.slot_level(4, "inner", 1), "far", "inner slot after the diminished one is far")
+t.eq(circle.slot_level(5, "outer", 1), "far", "fifth column is far in major")
+t.eq(circle.slot_level(5, "outer", 6), "home", "the major V is home in minor")
+t.eq(circle.slot_level(-1, "outer", 1), "near", "negative columns wrap")
+
+local function suffix(c)
+  local id = theory.CHORD_TYPES[c.type].id
+  return id == "min" and "m" or id == "dim" and "°" or ""
+end
+---@return string home, string near
+local function levels(key, mode)
+  local o, i = circle.ring_chords(key, mode)
+  local out = { home = {}, near = {}, far = {} }
+  for _, ring in ipairs { o, i } do
+    for k = 1, 12 do
+      local c = ring[k]
+      table.insert(out[c.level], theory.note_name(c.root, c.flats) .. suffix(c))
+    end
+  end
+  return table.concat(out.home, " "), table.concat(out.near, " ")
+end
+local home, nearby = levels(0, 1)
+t.eq(home, "C G F Am Em B° Dm", "C major home")
+t.eq(nearby, "D Bb Gm", "C major next door")
+home, nearby = levels(0, 6)
+t.eq(home, "G Ab Eb Bb Fm Cm Gm D°", "C minor home, with the major V")
+t.eq(nearby, "Db F Bbm", "C minor next door")
+home, nearby = levels(9, 6)
+t.eq(home, "C G E F Am Em B° Dm", "A minor home: the chords of C major plus E")
+
 local outer, inner = circle.ring_chords(0, 1)
 t.eq(outer[1].numeral, "I", "C major is I")
 t.eq(outer[2].numeral, "V", "G major is V")
 t.eq(outer[12].numeral, "IV", "F major is IV")
-t.eq(outer[3].numeral, nil, "D major not diatonic in C")
-t.eq(outer[3].in_key, false, "D major out of key")
+t.eq(outer[3].numeral, "II", "D major in C has a numeral")
+t.eq(outer[7].numeral, "bV", "chords far from home keep their numeral")
 t.eq(inner[1].numeral, "vi", "A minor is vi")
 t.eq(inner[2].numeral, "iii", "E minor is iii")
 t.eq(inner[3].numeral, "vii°", "B is the diminished degree")
 t.eq(theory.CHORD_TYPES[inner[3].type].id, "dim", "inner ring shows B dim")
 t.eq(inner[12].numeral, "ii", "D minor is ii")
-t.eq(inner[4].in_key, false, "F# minor out of key")
+t.eq(#outer[1].outside, 0, "C major has no note outside C")
+t.eq(outer[3].outside[1], 6, "D major in C uses F#")
+t.eq(circle.ring_tooltip(outer[1]), "I: in the key.", "home tooltip")
+t.eq(
+  circle.ring_tooltip(outer[3]),
+  "II: next door. One step from the key, it changes one note: F#.",
+  "near tooltip"
+)
+t.eq(
+  circle.ring_tooltip(outer[9]),
+  "bVI: far from home. It uses Ab and Eb.",
+  "far tooltip spells flats on the flat side"
+)
+local cmin_outer = circle.ring_chords(0, 6)
+t.eq(
+  circle.ring_tooltip(cmin_outer[2]),
+  "V: home in minor. The usual dominant, with B from harmonic minor.",
+  "minor dominant tooltip"
+)
 t.eq(outer[11].flats, true, "Bb side of the circle spells flats in C")
 t.eq(outer[2].flats, false, "G side spells sharps in C")
 t.eq(outer[7].flats, false, "tritone from C spells F# (C prefers sharps)")
@@ -85,21 +145,31 @@ local fo = circle.ring_chords(5, 1)
 t.eq(fo[6].flats, true, "tritone from F spells flats (F prefers flats)")
 t.eq(fo[12].flats, false, "the tonic itself is not flat-side")
 t.eq(fo[1].flats, false, "C is on the sharp side of F")
-local maj_t = assert(theory.type_index "maj")
-local min_t = assert(theory.type_index "min")
-local dim_t = assert(theory.type_index "dim")
-local r1, k1 = circle.ring_for_pad { root = 7, type = maj_t, inversion = 0, octave = 4 }
-t.eq(r1 .. k1, "outer1", "G major maps to the outer ring at G")
-local r2, k2 = circle.ring_for_pad { root = 9, type = min_t, inversion = 0, octave = 4 }
-t.eq(r2 .. k2, "inner0", "A minor maps to the inner ring under C")
-local r3, k3 = circle.ring_for_pad { root = 11, type = dim_t, inversion = 0, octave = 4 }
-t.eq(r3 .. k3, "inner2", "B dim maps to the inner ring under D")
-local r4, k4 = circle.ring_for_pad {
-  root = 0,
-  type = assert(theory.type_index "dom7"),
-  inversion = 0,
-  octave = 4,
-}
-t.eq(r4 .. k4, "outer0", "C7 maps to the outer ring at C")
+
+---@return Pad
+local function pad(root, id)
+  return { root = root, type = assert(theory.type_index(id)), inversion = 0, octave = 4 }
+end
+local function slot(p, key, mode)
+  local ring, k = circle.ring_for_pad(p, key, mode)
+  return ring .. k
+end
+t.eq(slot(pad(7, "maj"), 0, 1), "outer1", "G major maps to the outer ring at G")
+t.eq(slot(pad(9, "min"), 0, 1), "inner0", "A minor maps to the inner ring under C")
+t.eq(slot(pad(11, "dim"), 0, 1), "inner2", "B dim maps to the inner ring under D")
+t.eq(slot(pad(0, "dom7"), 0, 1), "outer0", "C7 maps to the outer ring at C")
+t.eq(slot(pad(2, "5"), 0, 1), "inner11", "D5 in C major lights Dm")
+t.eq(slot(pad(2, "5"), 2, 1), "outer2", "D5 in D major lights D")
+t.eq(slot(pad(7, "sus4"), 0, 1), "outer1", "Gsus4 in C major: both are home, outer wins")
+
+t.eq(circle.pad_level(pad(2, "5"), 0, 1), "home", "D5 is home in C major")
+t.eq(circle.pad_level(pad(4, "5"), 0, 1), "home", "E5 is home in C major")
+t.eq(circle.pad_level(pad(2, "maj"), 0, 1), "near", "D major is next door in C major")
+t.eq(circle.pad_level(pad(2, "dom7"), 0, 1), "near", "D7 is next door in C major")
+t.eq(circle.pad_level(pad(11, "min"), 0, 1), "near", "Bm on the B° slot is only next door")
+t.eq(circle.pad_level(pad(8, "maj"), 0, 1), "far", "Ab is far from C major")
+t.eq(circle.pad_level(pad(7, "dom7"), 0, 6), "home", "G7 is home in C minor")
+t.eq(circle.pad_level(pad(7, "maj7"), 0, 6), "near", "Gmaj7 on the V slot of C minor is near")
+t.eq(circle.pad_level(pad(2, "5"), 0, 6), "near", "D5 in C minor: A is not in the key")
 
 t.done()

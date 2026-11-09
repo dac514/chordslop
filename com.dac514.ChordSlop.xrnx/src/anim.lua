@@ -90,7 +90,10 @@ function M.go(rotation_deg, wedge_deg, animate)
     return
   end
   local dr = circle.shortest_delta(state.rotation, rotation_deg)
-  local dw = circle.shortest_delta(state.wedge, wedge_deg)
+  -- The window sits on screen at rotation + wedge: let that sum take the
+  -- short way round, not the wedge on its own.
+  local ds = circle.shortest_delta(state.rotation + state.wedge, rotation_deg + wedge_deg)
+  local dw = ds - dr
   if not animate or (dr == 0 and dw == 0) then
     M.stop_timer()
     state.rotation = rotation_deg % 360

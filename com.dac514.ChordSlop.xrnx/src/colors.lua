@@ -1,7 +1,8 @@
 --[[
   Pad colours. Pure Lua: the UI hands in the theme's button colour (when it
-  can read it) and gets back the palette for in-key, borrowed and out-of-key
-  pads. Colours are `{ r, g, b }` with 0-255 integer components.
+  can read it) and gets back the palette for the three circle levels (see
+  `circle.slot_level`): green for home, blue for next door, the theme colour
+  for far. Colours are `{ r, g, b }` with 0-255 integer components.
 ]]
 
 local M = {}
@@ -23,14 +24,17 @@ function M.blend(a, b, t)
 end
 
 ---@class PadPalette
----@field in_key RGB
----@field borrowed RGB Accent for armed states such as MIDI learn.
+---@field home RGB The chords of the key.
+---@field near RGB Next door: the chords of the closely related keys.
+---@field learn RGB Accent for armed states such as MIDI learn.
 ---@field out RGB `{0,0,0}` means "theme default" for a Renoise button
 ---@field highlight fun(color: RGB): RGB Brightened version for the selected pad
 
 M.GREEN = { 60, 170, 90 }
+M.BLUE = { 70, 135, 215 }
 M.AMBER = { 220, 150, 40 }
 M.DEFAULT_BUTTON = { 70, 70, 70 }
+M.MIX = 0.55
 
 ---Build the pad palette around the theme's button colour.
 ---@param button_back RGB? nil when the theme is unavailable
@@ -38,8 +42,9 @@ M.DEFAULT_BUTTON = { 70, 70, 70 }
 function M.palette(button_back)
   local base = button_back or M.DEFAULT_BUTTON
   local palette = {
-    in_key = M.blend(base, M.GREEN, 0.55),
-    borrowed = M.blend(base, M.AMBER, 0.55),
+    home = M.blend(base, M.GREEN, M.MIX),
+    near = M.blend(base, M.BLUE, M.MIX),
+    learn = M.blend(base, M.AMBER, M.MIX),
     out = { 0, 0, 0 },
   }
   function palette.highlight(color)
@@ -49,14 +54,16 @@ function M.palette(button_back)
   return palette
 end
 
----Colour for a pad function. Only in-key chords are coloured, so the pads
----read the same way as the circle; everything else keeps the theme colour.
+---Colour for a circle level. The circle buttons and the pads both use it,
+---so a pad always has the colour of the circle button it lights.
 ---@param palette PadPalette
----@param func "in_key"|"borrowed"|"out"|"empty"
+---@param level CircleLevel|"empty"
 ---@return RGB
-function M.for_function(palette, func)
-  if func == "in_key" then
-    return palette.in_key
+function M.for_level(palette, level)
+  if level == "home" then
+    return palette.home
+  elseif level == "near" then
+    return palette.near
   end
   return palette.out
 end

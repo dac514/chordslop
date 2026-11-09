@@ -4,6 +4,8 @@ Chord pads for [Renoise](https://www.renoise.com) with a circle of fifths that
 turns to the key you are in. Sixteen pads, playable from the mouse, a MIDI
 controller or the QWERTY keyboard, recording straight into the pattern editor.
 
+![The ChordSlop dialog: circle of fifths on the left, 4x4 chord pads on the right](docs/chordslop.png)
+
 The tool itself lives in [`com.dac514.ChordSlop.xrnx/`](com.dac514.ChordSlop.xrnx/);
 its [README](com.dac514.ChordSlop.xrnx/README.md) is the user guide. Everything else
 in this repository is development tooling from the

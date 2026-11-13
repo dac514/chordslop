@@ -86,6 +86,48 @@ function M.transpose(pads, delta)
   return out
 end
 
+---Count the pads that are in key.
+---@param pads Pad[]
+---@param key integer 0-11
+---@param mode integer 1-7
+---@return integer in_key Pads whose tones are all in the key (see `theory.analyze`).
+---@return integer total Pads that are not empty.
+function M.fit(pads, key, mode)
+  local in_key, total = 0, 0
+  for _, pad in ipairs(pads) do
+    if not M.is_empty(pad) then
+      total = total + 1
+      if theory.analyze(pad.root, pad.type, key, mode).func == "in_key" then
+        in_key = in_key + 1
+      end
+    end
+  end
+  return in_key, total
+end
+
+---Moves that `best_fit` tries, the preferred one first: the smallest move
+---wins a tie, and a move down wins over the same move up.
+local FIT_MOVES = { 0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, 6 }
+
+---The transposition of all pads together that puts the most of them in key.
+---Moving the pads by `delta` fits like leaving them and moving the key by
+---`-delta`, so nothing is transposed here; hand the result to `transpose`.
+---@param pads Pad[]
+---@param key integer 0-11
+---@param mode integer 1-7
+---@return integer delta -5..6 semitones; 0 when no move beats the pads as they are.
+---@return integer in_key Pads in key after that move.
+function M.best_fit(pads, key, mode)
+  local best_delta, best = 0, -1
+  for _, delta in ipairs(FIT_MOVES) do
+    local in_key = M.fit(pads, (key - delta) % 12, mode)
+    if in_key > best then
+      best_delta, best = delta, in_key
+    end
+  end
+  return best_delta, best
+end
+
 ---Flatten pads into four plain number lists (what the preferences store).
 ---@param pads Pad[]
 ---@return integer[] roots, integer[] types, integer[] inversions, integer[] octaves

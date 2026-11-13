@@ -5,7 +5,7 @@
 
   Layout (about 960 x 520):
     header   key, mode, transpose pads | presets
-    body     circle of fifths panel    | 4x4 pad grid + pad editor
+    body     circle of fifths panel    | 4x4 pad grid, pad editor, notes and fit line
     footer   MIDI device, pad 1 note, learn | QWERTY, animate | status
 ]]
 
@@ -51,6 +51,7 @@ local HELD_OUTER, HELD_INNER, HELD_CENTER = 100, 200, 300
 ---@field load_preset fun(index: integer) Preset index: factory first, then user presets.
 ---@field save_preset fun(name: string)
 ---@field delete_preset fun() Delete the preset the pads came from (user presets only).
+---@field fit_pads fun() Move all pads together to where the most of them are in key.
 ---@field destroy fun()
 
 ---Key popup labels: both spellings so every key reads naturally.
@@ -59,6 +60,16 @@ local KEY_ITEMS =
 
 local TIP_KEY = "Key: the root note everything is measured from. "
   .. "Changing it turns the circle and, with Transpose pads on, moves every pad along."
+local TIP_TRANSPOSE = "On: the pads move with the key and keep their roman numerals. "
+  .. "Off: the pads keep their notes, and the numerals and colours show how they fit the new key. "
+  .. "Neither changes how many pads are in key. Use Fit pads to key for that."
+local TIP_FIT = "Moves all pads together to where the most of them are in the key. "
+  .. "The pads keep their chord types, their inversions and the distances between them."
+local TIP_FIT_DONE = "Every pad is in the key, so there is nothing to fit."
+local TIP_FIT_BEST = "This is the best fit: no move of all pads together puts more of them in the key. "
+  .. "Fit pads to key never changes a single pad. To change one, select it and use the pad editor, "
+  .. "or assign a green chord from the circle."
+local TIP_FIT_COUNT = "How many pads use only notes of the key."
 local TIP_MODE = "Mode: the scale built on the key (major, minor, Dorian...). "
   .. "It decides which chords count as in key (green) and how the circle is shaded. "
   .. "A preset you picked and have not edited is re-rendered in the new mode."
@@ -291,11 +302,29 @@ function M.build(app, palette)
     end
   end
 
+  ---The count of pads in key, and whether moving all pads would raise it.
+  ---When the button is off, the tooltips say why.
+  local function refresh_fit()
+    local in_key, total = pads_mod.fit(ctl.pads, ctl.key, ctl.mode)
+    local delta = pads_mod.best_fit(ctl.pads, ctl.key, ctl.mode)
+    local tip = TIP_FIT
+    if delta == 0 and total > 0 then
+      tip = in_key == total and TIP_FIT_DONE or TIP_FIT_BEST
+    end
+    local label = vb.views.fit_label --[[@as renoise.Views.Text]]
+    label.text = total > 0 and ("%d of %d pads in key"):format(in_key, total) or ""
+    label.tooltip = TIP_FIT_COUNT .. "\n\n" .. tip
+    local button = vb.views.fit_pads --[[@as renoise.Views.Button]]
+    button.active = delta ~= 0
+    button.tooltip = tip
+  end
+
   function ctl.refresh_all()
     refresh_pads()
     refresh_editor()
     refresh_key_label()
     refresh_status()
+    refresh_fit()
     if refresh_circle then
       refresh_circle()
     end
@@ -349,6 +378,7 @@ function M.build(app, palette)
     mark_dirty()
     refresh_pad(ctl.selected)
     refresh_editor()
+    refresh_fit()
   end
 
   -- Key and mode ---------------------------------------------------------------
@@ -401,6 +431,33 @@ function M.build(app, palette)
       ctl.refresh_all()
       animate_circle()
     end
+  end
+
+  ---Move all pads together to where the most of them are in key. A key change
+  ---never does this by itself: it cannot tell a pad that left the key by
+  ---accident from a chord that was chosen from outside the key.
+  function ctl.fit_pads()
+    local delta = pads_mod.best_fit(ctl.pads, ctl.key, ctl.mode)
+    if delta == 0 then
+      return
+    end
+    ctl.pads = pads_mod.transpose(ctl.pads, delta)
+    save_pads()
+    mark_dirty()
+    ctl.refresh_all()
+    local in_key, total = pads_mod.fit(ctl.pads, ctl.key, ctl.mode)
+    local steps = math.abs(delta)
+    renoise.app():show_status(
+      ("ChordSlop: moved the pads %s %d semitone%s. %d of %d are in %s %s."):format(
+        delta < 0 and "down" or "up",
+        steps,
+        steps == 1 and "" or "s",
+        in_key,
+        total,
+        theory.note_name(ctl.key, flats()),
+        theory.MODES[ctl.mode].name
+      )
+    )
   end
 
   -- MIDI -----------------------------------------------------------------------
@@ -720,6 +777,7 @@ function M.build(app, palette)
       mark_dirty()
       refresh_pad(ctl.selected)
       refresh_editor()
+      refresh_fit()
     end
     local ring_key = ("%s_%d"):format(ring, k)
     ring_active[ring_key] = true
@@ -950,7 +1008,7 @@ function M.build(app, palette)
       vb:checkbox { id = "transpose", bind = prefs.transpose_pads },
       vb:text {
         text = "Transpose pads with key",
-        tooltip = "On: changing the key moves every pad with it. Off: the pads stay and only their numerals and colours follow the key.",
+        tooltip = TIP_TRANSPOSE,
       },
     },
     vb:horizontal_aligner {
@@ -1027,10 +1085,11 @@ function M.build(app, palette)
     },
   }
 
-  local editor = vb:row {
+  -- An aligner, because a plain row shrinks to its content and would end short of the grid.
+  local editor = vb:horizontal_aligner {
     id = "editor",
-    spacing = GAP,
-    style = "group",
+    mode = "justify",
+    background = "group",
     margin = GAP,
     size = { width = GRID_W, height = LABEL_H + 2 * GAP },
     vb:text { id = "editor_title", font = "bold", width = 44, tooltip = "The selected pad" },
@@ -1116,11 +1175,28 @@ function M.build(app, palette)
     spacing = GAP,
     grid,
     editor,
-    vb:text {
-      id = "editor_notes",
-      style = "disabled",
-      font = "mono",
-      tooltip = "The notes the selected pad plays, lowest first",
+    vb:horizontal_aligner { -- the selected pad's notes on the left, all pads against the key on the right
+      id = "pads_footer",
+      mode = "justify",
+      width = GRID_W,
+      vb:text {
+        id = "editor_notes",
+        style = "disabled",
+        font = "mono",
+        tooltip = "The notes the selected pad plays, lowest first",
+      },
+      vb:row {
+        spacing = SPACING,
+        vb:text { id = "fit_label", style = "disabled", tooltip = TIP_FIT_COUNT },
+        vb:button {
+          id = "fit_pads",
+          text = "Fit pads to key",
+          tooltip = TIP_FIT,
+          notifier = app.guard(function()
+            ctl.fit_pads()
+          end),
+        },
+      },
     },
   }
 

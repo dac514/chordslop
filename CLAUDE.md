@@ -93,7 +93,7 @@ docs/renoise/                 vendored xrnx guide pages (start/, guide/)
 <Id>.xrnx/src/store.lua       preferences adapter: pads <-> number lists, user preset DocumentList CRUD
 <Id>.xrnx/src/anim.lua        circle rotation tween on an App.reg timer
 <Id>.xrnx/src/theory.lua      pure: chord types, modes, build_notes, roman numeral analysis (tests/theory_test.lua)
-<Id>.xrnx/src/pads.lua        pure: 16-pad model, transpose, labels, list round trip
+<Id>.xrnx/src/pads.lua        pure: 16-pad model, transpose, fit to key, labels, list round trip
 <Id>.xrnx/src/circle.lua      pure: circle-of-fifths geometry, rotation targets, easing, ring chords
 <Id>.xrnx/src/input.lua       pure: MIDI decode, MIDI/QWERTY note -> pad index
 <Id>.xrnx/src/record.lua      pure: where a chord is written (step/live), note-off placement

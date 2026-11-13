@@ -48,6 +48,33 @@ for _, preset in ipairs(presets.FACTORY) do
   end
 end
 
+-- no two pads of a factory preset play the same notes, in any key
+for _, preset in ipairs(presets.FACTORY) do
+  local modes = preset.mode and { preset.mode } or { 1, 2, 3, 4, 5, 6, 7 }
+  for _, mode in ipairs(modes) do
+    for key = 0, 11 do
+      ---@type table<string, integer> notes -> first pad that plays them
+      local seen = {}
+      for i, pad in ipairs(presets.render(preset, key, mode)) do
+        if not pads_mod.is_empty(pad) then
+          local notes = table.concat(pads_mod.notes(pad), ",")
+          t.check(
+            not seen[notes],
+            ("%s pad %d plays the notes of pad %s in key %d mode %d"):format(
+              preset.name,
+              i,
+              tostring(seen[notes]),
+              key,
+              mode
+            )
+          )
+          seen[notes] = seen[notes] or i
+        end
+      end
+    end
+  end
+end
+
 -- every preset renders in every key and mode without errors and stays in range
 for _, preset in ipairs(presets.FACTORY) do
   t.check(#preset.pads <= pads_mod.COUNT, preset.name .. ": at most 16 pads")
@@ -85,6 +112,9 @@ end
 local power = presets.render(find "Power", 0, 1)
 t.eq(theory.CHORD_TYPES[power[1].type].id, "5", "power chords are fifths")
 t.eq(power[9].octave, 3, "octave offset applied")
+for _, i in ipairs { 7, 8, 15, 16 } do
+  t.eq(power[i].type, 0, "six degrees carry a perfect fifth, so power pad " .. i .. " is empty")
+end
 local low = presets.render(find "Power", 0, 1, 0)
 t.eq(low[9].octave, 0, "octave offset clamps at 0")
 
@@ -134,7 +164,7 @@ local c_major = presets.render(jazz, 0, 1)
 local c_minor = presets.remode(jazz, c_major, 0, 1, theory.MODE_AEOLIAN)
 t.eq(
   names(c_minor, 0, theory.MODE_AEOLIAN),
-  "Dm7b5 Gm7 Cm7 C6 Ebmaj7 Abmaj7 Dm7b5 Gm7 Fm7 Bb7 Ebmaj7 Abmaj7 Dm7b5 Gm7 Cm7 Abmaj7",
+  "Dm7b5 Gm7 Cm7 C6 Ebmaj7 Abmaj7 Dm7b5 Gm7 Fm7 Bb7 Ebmaj7 Abmaj7 Dm7b5 Gm7 Cm7 Fm7",
   "jazz preset re-rendered in C Aeolian"
 )
 local green = 0

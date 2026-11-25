@@ -147,4 +147,22 @@ t.eq(none, 0, "empty pads: none in key")
 t.eq(none_total, 0, "empty pads: none counted")
 t.eq(pads.best_fit({ pads.empty() }, 0, 1), 0, "empty pads need no move")
 
+-- key offsets: every key from C, and one move per pair of keys
+t.eq(pads.key_offset(0), 0, "C is the home key")
+t.eq(pads.key_offset(6), 6, "F# is above C")
+t.eq(pads.key_offset(7), -5, "G is below C")
+t.eq(pads.key_offset(11), -1, "B is below C")
+t.eq(pads.key_delta(9, 0), 3, "A to C goes up 3")
+t.eq(pads.key_delta(4, 9), -7, "E to A goes down 7, so the route does not matter")
+t.eq(pads.key_delta(6, 7), -11, "F# to G is the seam")
+
+-- equal: empty pads match whatever they hold, the bass counts only when set
+t.check(pads.equal(pads.empty(), { root = 5, type = 0, inversion = 2, octave = 7 }), "empties")
+t.check(not pads.equal(p, pads.empty()), "a chord is not an empty pad")
+t.check(pads.equal(p, { root = 11, type = maj, inversion = 0, octave = 4, bass = -1 }), "no bass")
+t.check(not pads.equal(p, { root = 11, type = maj, inversion = 0, octave = 5 }), "octave counts")
+t.check(not pads.equal(p, { root = 11, type = maj, inversion = 0, octave = 4, bass = 2 }), "bass")
+t.check(pads.all_equal({ p }, { p }), "all_equal fills missing pads with empty ones")
+t.check(not pads.all_equal({ p }, {}), "all_equal sees a missing chord")
+
 t.done()

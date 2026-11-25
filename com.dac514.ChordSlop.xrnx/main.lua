@@ -33,6 +33,7 @@ if not renoise.tool().preferences then
   -- A user preset, stored relative to a key (see src/presets.lua and src/store.lua).
   renoise.Document.create "ChordSlopPreset" {
     name = "",
+    version = 0, -- 0 = saved by an older ChordSlop (octaves from octave 4); 1 = octaves from the key
     mode = 0,
     degrees = { 0 },
     accidentals = { 0 },
@@ -68,7 +69,7 @@ if not renoise.tool().preferences then
     pad_basses = sixteen(-1), -- slash bass pitch class; -1 = none
     voicing = 2, -- 1 Close, 2 Open, 3 Wide (src/voicing.lua)
     preset_name = "", -- the preset the pads came from ("" = none)
-    preset_dirty = false, -- the pads have been edited since that preset was loaded
+    preset_dirty = false, -- the pads differ from that preset; the dialog checks it again when it opens
     presets = renoise.Document.DocumentList(),
   }
 end

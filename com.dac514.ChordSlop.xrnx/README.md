@@ -86,6 +86,10 @@ whole octaves, so it keeps its shape.
 pads with key* is on, the pads move with the key. When it is off, the pads
 keep their chords, and the colours show how they fit the new key.
 
+The pads always land in the same place for a key, whatever keys you chose
+before. Keys from C up to F# sit above C, and keys from G up to B sit below
+it. So a move from F# to G takes the pads down 11 semitones.
+
 **Fit pads to key.** Under the pads, ChordSlop counts the pads that are in the
 key. *Fit pads to key* moves all pads together to where the most of them are
 in the key. It never changes a single pad, so it is active only when a better
@@ -107,9 +111,11 @@ every chord over one held bass note, for plucks and arpeggiators.
   the mode too, and become sevenths where the mode has no such chord. So two
   pads can then play the same chord.
 
-After you edit a pad, the preset name gets an asterisk. Choose the preset
-again to restore it. *Save* stores your own layout under a name, and *Delete*
-removes it. A saved layout follows the key like the factory presets.
+The presets are in alphabetical order, and your own presets follow them.
+When the pads differ from the preset, the preset name gets an asterisk. If
+you undo the change, the asterisk goes away. Choose the preset again to
+restore it. *Save* stores your own layout under a name, and *Delete* removes
+it. A saved layout follows the key like the factory presets.
 
 ## Playing
 

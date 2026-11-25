@@ -97,7 +97,7 @@ for _, preset in ipairs(presets.FACTORY) do
   end
 end
 
-local diatonic = presets.render(presets.FACTORY[1], 0, 1)
+local diatonic = presets.render(presets.default(), 0, 1)
 t.eq(
   names(diatonic, 0, 1),
   "C Dm Em F G Am Bdim - Cmaj7 Dm7 Em7 Fmaj7 G7 Am7 Bm7b5 -",
@@ -161,7 +161,7 @@ t.eq(
   "Em7b5",
   "captured ii adapts to minor"
 )
-local triads = presets.capture(presets.render(presets.FACTORY[1], 0, 1), 0, 1, "tri")
+local triads = presets.capture(presets.render(presets.default(), 0, 1), 0, 1, "tri")
 t.eq(triads.pads[2] and triads.pads[2].t, nil, "diatonic triad captured without type")
 t.eq(triads.pads[2] and triads.pads[2].s, nil, "diatonic triad captured without s")
 t.eq(triads.pads[8], false, "empty pad stays empty")
@@ -198,9 +198,9 @@ t.eq(names({ b_minor[3] }, 11, theory.MODE_AEOLIAN), "Bm9", "tonic major ninth b
 t.eq(b_minor[1].octave, 4, "ii keeps its octave")
 
 -- remode moves a root by the shortest route when the degree wraps across C
-local cs_major = presets.render(presets.FACTORY[1], 1, 1) -- C# major: degree 7 is C (B#)
+local cs_major = presets.render(presets.default(), 1, 1) -- C# major: degree 7 is C (B#)
 t.eq(cs_major[7].root, 0, "degree 7 of C# major is C")
-local cs_minor = presets.remode(presets.FACTORY[1], cs_major, 1, 1, theory.MODE_AEOLIAN)
+local cs_minor = presets.remode(presets.default(), cs_major, 1, 1, theory.MODE_AEOLIAN)
 t.eq(cs_minor[7].root, 11, "degree 7 of C# minor is B")
 t.eq(cs_minor[7].octave, cs_major[7].octave - 1, "B sits a semitone below the C it replaces")
 t.eq(cs_minor[8].type, 0, "empty slots stay empty")
@@ -291,6 +291,112 @@ t.check(
   #problems == 0,
   "every preset round trips and survives every mode: " .. table.concat(problems, "; ")
 )
+
+-- the list is in alphabetical order, the default is found by name
+for i = 2, #presets.FACTORY do
+  t.check(
+    presets.FACTORY[i - 1].name:lower() < presets.FACTORY[i].name:lower(),
+    "factory presets sorted: " .. presets.FACTORY[i].name
+  )
+end
+t.eq(presets.default().name, presets.DEFAULT_NAME, "default preset by name")
+
+-- a preset has one place in each key, whatever route the key took to get there
+local route_problems = {}
+for _, preset in ipairs(presets.FACTORY) do
+  local mode = preset.mode or 1
+  for from = 0, 11 do
+    local start = presets.render(preset, from, mode)
+    for to = 0, 11 do
+      local moved = pads_mod.transpose(start, pads_mod.key_delta(from, to))
+      if not presets.matches(preset, moved, to, mode) then
+        route_problems[#route_problems + 1] = ("%s %d->%d"):format(preset.name, from, to)
+      end
+    end
+  end
+end
+t.check(
+  #route_problems == 0,
+  "a key change gives the preset loaded in that key: " .. table.concat(route_problems, "; ")
+)
+
+-- the video: Epic heroes in A, then the key goes to C
+local epic = assert(presets.find "Epic heroes")
+local in_a = presets.render(epic, 9, theory.MODE_AEOLIAN)
+local a_to_c = pads_mod.transpose(in_a, pads_mod.key_delta(9, 0))
+t.eq(a_to_c[1].octave, 4, "Asus2 moved to C stays in octave 4")
+t.check(presets.matches(epic, a_to_c, 0, theory.MODE_AEOLIAN), "and is still the preset")
+a_to_c[1].octave = 5
+t.check(not presets.matches(epic, a_to_c, 0, theory.MODE_AEOLIAN), "one octave up is an edit")
+a_to_c[1].octave = 4
+t.check(presets.matches(epic, a_to_c, 0, theory.MODE_AEOLIAN), "undoing the edit matches again")
+
+-- a preset keeps its shape: pads go up from the tonic in every key
+local in_c = presets.render(epic, 0, theory.MODE_AEOLIAN)
+local in_g = presets.render(epic, 7, theory.MODE_AEOLIAN)
+t.eq(in_c[1].octave * 12 + in_c[1].root, 48, "tonic of C at C-4")
+t.eq(in_g[1].octave * 12 + in_g[1].root, 43, "tonic of G at G-3, the nearest G to C")
+t.eq(in_g[11].octave * 12 + in_g[11].root, 48 + 10 - 5, "VII of G minor at F-4")
+
+-- capture is the inverse of render, in every key
+local capture_problems = {}
+for _, preset in ipairs(presets.FACTORY) do
+  local mode = preset.mode or 1
+  for key = 0, 11 do
+    local pads = presets.render(preset, key, mode)
+    local captured = presets.capture(pads, key, mode, "x")
+    if not presets.matches(captured, pads, key, mode) then
+      capture_problems[#capture_problems + 1] = ("%s in %d"):format(preset.name, key)
+    end
+    local other = (key + 5) % 12
+    if
+      not pads_mod.all_equal(
+        presets.render(captured, other, mode),
+        presets.render(preset, other, mode)
+      )
+    then
+      capture_problems[#capture_problems + 1] = ("%s from %d to %d"):format(preset.name, key, other)
+    end
+  end
+end
+t.check(
+  #capture_problems == 0,
+  "a saved preset loads back as it was: " .. table.concat(capture_problems, "; ")
+)
+local high = presets.render(epic, 9, theory.MODE_AEOLIAN)
+high[1].octave = high[1].octave + 1
+local high_spec = presets.capture(high, 9, theory.MODE_AEOLIAN, "high").pads[1]
+t.eq(high_spec and high_spec.o, 1, "a pad an octave up is captured as o = 1")
+
+-- a mode change of an unedited preset gives the preset in the new mode
+local remode_problems = {}
+for _, preset in ipairs(presets.FACTORY) do
+  for key = 0, 11 do
+    for from = 1, 7 do
+      for to = 1, 7 do
+        local moved = presets.remode(preset, presets.render(preset, key, from), key, from, to)
+        if not presets.matches(preset, moved, key, to) then
+          remode_problems[#remode_problems + 1] = ("%s %d %d->%d"):format(
+            preset.name,
+            key,
+            from,
+            to
+          )
+        end
+      end
+    end
+  end
+end
+t.check(
+  #remode_problems == 0,
+  "remode = render in the new mode: " .. table.concat(remode_problems, "; ")
+)
+
+-- user presets saved by an older ChordSlop keep their octaves
+local legacy = { name = "old", legacy_octaves = true, pads = { { d = 1 }, { d = 3, o = 1 } } }
+local old_a = presets.render(legacy, 9, theory.MODE_AEOLIAN)
+t.eq(old_a[1].octave, 4, "legacy: tonic of A in octave 4")
+t.eq(old_a[2].octave, 5, "legacy: C one octave up from octave 4")
 
 -- the longest pad name a factory preset shows, so the pad font can be checked
 local longest = ""

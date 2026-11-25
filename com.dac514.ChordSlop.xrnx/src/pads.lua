@@ -67,6 +67,56 @@ function M.normalize(pad)
   }
 end
 
+---Where a key sits from C, in semitones: -5 (G) to +6 (F#). Presets render
+---in C and move by this much, and a key change moves the pads by the
+---difference, so the pads in a key never depend on the keys visited before.
+---The cost is one seam: from F# to G the pads go down 11 semitones.
+---@param key integer 0-11
+---@return integer offset -5..6
+function M.key_offset(key)
+  key = key % 12
+  return key <= 6 and key or key - 12
+end
+
+---Semitones to move the pads when the key changes from `from` to `to`.
+---@param from integer 0-11
+---@param to integer 0-11
+---@return integer delta -11..11
+function M.key_delta(from, to)
+  return M.key_offset(to) - M.key_offset(from)
+end
+
+---Do two pads play the same chord in the same octave? Empty pads are equal
+---whatever else they hold.
+---@param a Pad
+---@param b Pad
+---@return boolean
+function M.equal(a, b)
+  if M.is_empty(a) or M.is_empty(b) then
+    return M.is_empty(a) and M.is_empty(b)
+  end
+  local a_bass = voicing.has_bass(a) and a.bass % 12 or M.NO_BASS
+  local b_bass = voicing.has_bass(b) and b.bass % 12 or M.NO_BASS
+  return a.root == b.root
+    and a.type == b.type
+    and a.inversion == b.inversion
+    and a.octave == b.octave
+    and a_bass == b_bass
+end
+
+---Do two sets of sixteen pads hold the same chords?
+---@param a Pad[]
+---@param b Pad[]
+---@return boolean
+function M.all_equal(a, b)
+  for i = 1, M.COUNT do
+    if not M.equal(a[i] or M.empty(), b[i] or M.empty()) then
+      return false
+    end
+  end
+  return true
+end
+
 ---Transpose every pad by `delta` semitones. The root wraps and the octave
 ---carries, clamped to the valid range; a slash bass moves with the root.
 ---Empty pads are left alone.

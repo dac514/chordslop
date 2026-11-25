@@ -55,7 +55,7 @@ local HELD_OUTER, HELD_INNER, HELD_CENTER = 100, 200, 300
 ---@field learn_armed boolean Next MIDI note-on sets the base note.
 ---@field circle_mode integer 1 = play, 2 = assign to the selected pad.
 ---@field preset_name string? The preset the pads came from; nil when unknown.
----@field dirty boolean The pads were edited since that preset was loaded.
+---@field dirty boolean The pads differ from that preset rendered in the current key and mode.
 ---@field press fun(index: integer, velocity: integer?, from_midi: boolean?)
 ---@field release fun(index: integer)
 ---@field learned fun(note: integer)
@@ -87,7 +87,7 @@ local TIP_MODE = "Mode: the scale built on the key (major, minor, Dorian...). "
   .. "A preset you picked and have not edited is re-rendered in the new mode."
 local TIP_PRESET_BASE = "Presets are ready-made layouts of 16 chords; pick one and it lands on the pads. "
   .. "Factory presets are written as scale degrees and render into the current key and mode; so do the ones you save. "
-  .. "An asterisk after the name means the pads were edited since; pick the preset again to get it back."
+  .. "An asterisk after the name means the pads differ from the preset; pick the preset again to get it back."
 local TIP_MIDI_BASE = "The lowest MIDI note of the controller pads; the 16 pads answer to this note and the "
   .. "15 above it, arranged by the layout next to it. Default C-3 (note 36) is pad 1 of bank A on an AKAI "
   .. "MPK mini. Or press Learn and hit that pad."
@@ -208,9 +208,10 @@ function M.build(app, palette)
     dirty = prefs.preset_dirty.value,
   }
   if pads_mod.all_empty(ctl.pads) then
-    ctl.pads = presets.render(presets.FACTORY[1], ctl.key, ctl.mode)
+    local default = presets.default()
+    ctl.pads = presets.render(default, ctl.key, ctl.mode)
     store.save_pads(prefs, ctl.pads)
-    ctl.preset_name, ctl.dirty = presets.FACTORY[1].name, false
+    ctl.preset_name, ctl.dirty = default.name, false
     prefs.preset_name.value, prefs.preset_dirty.value = ctl.preset_name, false
   end
   ---@type table<integer, boolean> pads currently sounding
@@ -248,8 +249,8 @@ function M.build(app, palette)
   local refresh_circle
   ---@type fun() Redraw the keyboard (defined with the keyboard below).
   local refresh_keyboard
-  ---@type fun() The pads no longer are the preset they came from (defined with the presets).
-  local mark_dirty
+  ---@type fun() Compare the pads with the preset they came from (defined with the presets).
+  local update_dirty
 
   local function flats()
     return theory.prefers_flats(ctl.key, ctl.mode)
@@ -544,7 +545,7 @@ function M.build(app, palette)
     update(ctl.pads[ctl.selected])
     ctl.pads[ctl.selected] = pads_mod.normalize(ctl.pads[ctl.selected])
     save_pads()
-    mark_dirty()
+    update_dirty()
     refresh_pad(ctl.selected)
     refresh_editor()
     refresh_fit()
@@ -566,20 +567,14 @@ function M.build(app, palette)
     if new_key == ctl.key then
       return
     end
-    local delta = new_key - ctl.key
-    if delta > 6 then
-      delta = delta - 12
-    elseif delta < -6 then
-      delta = delta + 12
-    end
     if prefs.transpose_pads.value then
-      ctl.pads = pads_mod.transpose(ctl.pads, delta)
+      -- the same move for every route to this key: see pads.key_offset
+      ctl.pads = pads_mod.transpose(ctl.pads, pads_mod.key_delta(ctl.key, new_key))
       save_pads()
-    else
-      mark_dirty() -- the pads are no longer the preset rendered in this key
     end
     ctl.key = new_key
     prefs.root_key.value = new_key
+    update_dirty() -- pads left where they were are no longer the preset in this key
     ctl.refresh_all()
     animate_circle()
   end
@@ -612,7 +607,7 @@ function M.build(app, palette)
     end
     ctl.pads = pads_mod.transpose(ctl.pads, delta)
     save_pads()
-    mark_dirty()
+    update_dirty()
     ctl.refresh_all()
     local in_key, total = pads_mod.fit(ctl.pads, ctl.key, ctl.mode)
     local steps = math.abs(delta)
@@ -669,29 +664,44 @@ function M.build(app, palette)
   local PRESET_NONE = "(unsaved)"
   local factory_count = #presets.FACTORY
 
-  ---Every preset by name: factory first, then the user's own after a separator.
+  ---The user presets in alphabetical order (case ignored), as stored indexes.
+  ---@return integer[] order, string[] names
+  local function user_order()
+    local names = store.user_preset_names(prefs)
+    local order = {}
+    for i = 1, #names do
+      order[i] = i
+    end
+    table.sort(order, function(a, b)
+      local x, y = names[a]:lower(), names[b]:lower()
+      if x ~= y then
+        return x < y
+      end
+      return a < b
+    end)
+    return order, names
+  end
+
+  ---Every preset by name: factory first, then the user's own after a separator,
+  ---each part in alphabetical order.
   ---@return string[]
   local function preset_items()
     local items = presets.names()
-    local user = store.user_preset_names(prefs)
-    if #user > 0 then
+    local order, names = user_order()
+    if #order > 0 then
       items[#items + 1] = PRESET_SEPARATOR
-      for _, name in ipairs(user) do
-        items[#items + 1] = name
+      for _, u in ipairs(order) do
+        items[#items + 1] = names[u]
       end
     end
     return items
   end
 
-  ---Preset index -> user preset index, or nil for factory entries and the separator.
+  ---Preset index -> stored user preset index, or nil for factory entries and the separator.
   ---@param index integer
   ---@return integer?
   local function user_index(index)
-    local u = index - factory_count - 1
-    if u >= 1 and u <= #store.user_preset_names(prefs) then
-      return u
-    end
-    return nil
+    return user_order()[index - factory_count - 1]
   end
 
   ---The preset behind a preset index, if any.
@@ -772,17 +782,28 @@ function M.build(app, palette)
     refresh_presets()
   end
 
-  mark_dirty = function()
-    if ctl.preset_name and not ctl.dirty then
-      set_origin(ctl.preset_name, true)
-    end
-  end
-
   ---The preset the pads came from, if it still exists.
   ---@return Preset?
   local function origin_preset()
     local index = find_preset(ctl.preset_name)
     return index and preset_at(index) or nil
+  end
+
+  ---Do the pads differ from their preset, rendered in the current key and mode?
+  ---@return boolean
+  local function pads_differ()
+    local preset = origin_preset()
+    return not (preset and presets.matches(preset, ctl.pads, ctl.key, ctl.mode))
+  end
+
+  update_dirty = function()
+    if not ctl.preset_name then
+      return
+    end
+    local dirty = pads_differ()
+    if dirty ~= ctl.dirty then
+      set_origin(ctl.preset_name, dirty)
+    end
   end
 
   ---Mode change from the user: an unedited preset is re-rendered in the new mode.
@@ -797,6 +818,7 @@ function M.build(app, palette)
       save_pads()
     end
     set_mode(new_mode)
+    update_dirty()
   end
 
   function ctl.load_preset(index)
@@ -948,7 +970,7 @@ function M.build(app, palette)
     if ctl.circle_mode == 2 then
       ctl.pads[ctl.selected] = pad
       save_pads()
-      mark_dirty()
+      update_dirty()
       refresh_pad(ctl.selected)
       refresh_editor()
       refresh_fit()
@@ -1595,6 +1617,10 @@ function M.build(app, palette)
 
   refresh_midi_popup()
   refresh_learn()
+  if ctl.preset_name then
+    ctl.dirty = pads_differ()
+    prefs.preset_dirty.value = ctl.dirty
+  end
   refresh_presets()
   ctl.refresh_all()
   anim.init(app, app.guard(apply_angles), rotation, wedge)

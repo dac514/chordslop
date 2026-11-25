@@ -15,8 +15,13 @@ local M = {}
 
 M.PRESET_MODEL = "ChordSlopPreset"
 
+---The format `save_user_preset` writes. Version 1 stores each octave offset
+---relative to where the root lands in the key (see `presets.render_pad`).
+M.PRESET_VERSION = 1
+
 ---@class ChordSlopPresetNode : renoise.Document.DocumentNode
 ---@field name renoise.Document.ObservableString
+---@field version renoise.Document.ObservableNumber 0 = older format (see `M.PRESET_VERSION`).
 ---@field mode renoise.Document.ObservableNumber
 ---@field degrees renoise.Document.ObservableNumberList 0 = empty pad
 ---@field accidentals renoise.Document.ObservableNumberList
@@ -110,6 +115,7 @@ function M.save_user_preset(prefs, preset)
   end
   local entry = prefs.presets:property(index) --[[@as ChordSlopPresetNode]]
   entry.name.value = preset.name
+  entry.version.value = M.PRESET_VERSION
   entry.mode.value = preset.mode or 0
   local degrees, accidentals, types, sevenths, inversions, octaves = {}, {}, {}, {}, {}, {}
   local basses, bass_accidentals = {}, {}
@@ -191,6 +197,7 @@ function M.load_user_preset(prefs, index)
   local mode = entry.mode.value
   return {
     name = entry.name.value,
+    legacy_octaves = entry.version.value < M.PRESET_VERSION or nil,
     mode = (mode >= 1 and mode <= #theory.MODES) and mode or nil,
     pads = specs,
   }

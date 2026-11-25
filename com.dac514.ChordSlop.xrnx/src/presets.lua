@@ -19,7 +19,8 @@
        (thirds stacked in the key, so they follow the mode like `s`; when
        the mode has no chord type for that stack, the seventh plays)
     i  inversion 0-3 (default 0): which chord tone is lowest
-    o  octave offset from the base octave (default 0)
+    o  octave offset (default 0): 0 puts the root where it lands in C
+       (octave 4), moved by `pads.key_offset(key)`, so up from the tonic
     b  scale degree 1-7 of a slash bass (default: none, the inversion decides)
     ba accidental on the slash bass: -1 flat, +1 sharp (default 0)
   `false` leaves the pad empty.
@@ -43,6 +44,7 @@ local M = {}
 
 ---@class Preset
 ---@field name string
+---@field legacy_octaves boolean? A user preset saved by an older ChordSlop: `o` is from octave 4, whatever the key.
 ---@field desc string? One line about the sound or use.
 ---@field mode integer? Mode the preset is written for; loading it switches the mode.
 ---@field pads (PresetPad|false)[] Up to 16 entries, row by row.
@@ -813,6 +815,41 @@ M.FACTORY = {
   },
 }
 
+-- The popup lists the factory presets in alphabetical order.
+table.sort(M.FACTORY, function(a, b)
+  return a.name:lower() < b.name:lower()
+end)
+
+---The preset a first start loads.
+M.DEFAULT_NAME = "Diatonic: triads + sevenths"
+
+---A factory preset by its exact name.
+---@param name string
+---@return Preset?
+function M.find(name)
+  for _, preset in ipairs(M.FACTORY) do
+    if preset.name == name then
+      return preset
+    end
+  end
+  return nil
+end
+
+---@return Preset
+function M.default()
+  return assert(M.find(M.DEFAULT_NAME), "default preset missing")
+end
+
+---Are the pads still the preset, rendered in this key and mode?
+---@param preset Preset
+---@param pads Pad[]
+---@param key integer 0-11
+---@param mode integer 1-7
+---@return boolean
+function M.matches(preset, pads, key, mode)
+  return pads_mod.all_equal(pads, M.render(preset, key, mode))
+end
+
 ---@return string[]
 function M.names()
   local names = {}
@@ -822,13 +859,27 @@ function M.names()
   return names
 end
 
----Turn one pad spec into a pad for a key/mode.
+---Semitones from the tonic up to the root of a pad spec: the degree in the
+---scale (0-11), then the accidental, which may step below the tonic or up to
+---the next one.
+---@param spec PresetPad
+---@param key integer
+---@param mode integer
+---@return integer
+local function interval(spec, key, mode)
+  return (theory.scale(key, mode)[spec.d] - key) % 12 + (spec.a or 0)
+end
+
+---Turn one pad spec into a pad for a key/mode. The pad lands where the spec
+---lands in C, moved by `pads.key_offset(key)`, so a preset has the same shape
+---in every key and loading it in a key gives what a key change to it gives.
 ---@param spec PresetPad
 ---@param key integer
 ---@param mode integer
 ---@param base_octave integer
+---@param legacy boolean? The old rule: every root in `base_octave + o`, whatever the key.
 ---@return Pad
-function M.render_pad(spec, key, mode, base_octave)
+function M.render_pad(spec, key, mode, base_octave, legacy)
   local scale = theory.scale(key, mode)
   local acc = spec.a or 0
   local root = (scale[spec.d] + acc) % 12
@@ -851,14 +902,20 @@ function M.render_pad(spec, key, mode, base_octave)
   if spec.b then
     bass = (scale[spec.b] + (spec.ba or 0)) % 12
   end
+  local octave
+  if legacy then
+    octave = base_octave + (spec.o or 0)
+  else
+    octave = math.floor(
+      ((base_octave + (spec.o or 0)) * 12 + interval(spec, key, mode) + pads_mod.key_offset(key))
+        / 12
+    )
+  end
   return pads_mod.normalize {
     root = root,
     type = type_index,
     inversion = spec.i or 0,
-    octave = math.max(
-      pads_mod.MIN_OCTAVE,
-      math.min(pads_mod.MAX_OCTAVE, base_octave + (spec.o or 0))
-    ),
+    octave = math.max(pads_mod.MIN_OCTAVE, math.min(pads_mod.MAX_OCTAVE, octave)),
     bass = bass,
   }
 end
@@ -875,7 +932,7 @@ function M.render(preset, key, mode, base_octave)
   for i = 1, pads_mod.COUNT do
     local spec = preset.pads[i]
     if spec then
-      pads[i] = M.render_pad(spec, key, mode, base_octave)
+      pads[i] = M.render_pad(spec, key, mode, base_octave, preset.legacy_octaves)
     else
       pads[i] = pads_mod.empty()
     end
@@ -985,8 +1042,10 @@ function M.capture_pad(pad, key, mode)
   if pad.inversion ~= 0 then
     spec.i = pad.inversion
   end
-  if pad.octave ~= pads_mod.DEFAULT_OCTAVE then
-    spec.o = pad.octave - pads_mod.DEFAULT_OCTAVE
+  -- the inverse of render_pad: the octave offset that puts the root back here
+  local placed = M.render_pad(spec, key, mode, pads_mod.DEFAULT_OCTAVE)
+  if pad.octave ~= placed.octave then
+    spec.o = pad.octave - placed.octave
   end
   if pad.bass and pad.bass >= 0 then
     local b, ba = spell(pad.bass, key, mode)

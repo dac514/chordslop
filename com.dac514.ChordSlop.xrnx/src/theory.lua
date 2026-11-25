@@ -16,6 +16,9 @@ local M = {}
 ---@field intervals integer[] Semitones from the root, ascending.
 
 ---Chord types by index. Pads and preferences store the index; 0 means "empty".
+---Append new types at the end: never insert or reorder, or saved pads change.
+---Extensions sit above the octave (9th = 14, 11th = 17, 13th = 21), so the
+---second interval is always the third (or the suspended tone).
 ---@type ChordType[]
 M.CHORD_TYPES = {
   { id = "maj", symbol = "", numeral = "", intervals = { 0, 4, 7 } },
@@ -34,6 +37,18 @@ M.CHORD_TYPES = {
   { id = "m6", symbol = "m6", numeral = "6", intervals = { 0, 3, 7, 9 } },
   { id = "add9", symbol = "add9", numeral = "add9", intervals = { 0, 4, 7, 14 } },
   { id = "5", symbol = "5", numeral = "5", intervals = { 0, 7 } },
+  { id = "maj9", symbol = "maj9", numeral = "maj9", intervals = { 0, 4, 7, 11, 14 } },
+  { id = "m9", symbol = "m9", numeral = "9", intervals = { 0, 3, 7, 10, 14 } },
+  { id = "9", symbol = "9", numeral = "9", intervals = { 0, 4, 7, 10, 14 } },
+  { id = "m11", symbol = "m11", numeral = "11", intervals = { 0, 3, 7, 10, 14, 17 } },
+  { id = "7sus4", symbol = "7sus4", numeral = "7sus4", intervals = { 0, 5, 7, 10 } },
+  { id = "9sus4", symbol = "9sus4", numeral = "9sus4", intervals = { 0, 5, 7, 10, 14 } },
+  { id = "madd9", symbol = "madd9", numeral = "add9", intervals = { 0, 3, 7, 14 } },
+  { id = "6add9", symbol = "6add9", numeral = "6add9", intervals = { 0, 4, 7, 9, 14 } },
+  { id = "13", symbol = "13", numeral = "13", intervals = { 0, 4, 7, 10, 14, 21 } },
+  { id = "7b9", symbol = "7b9", numeral = "7b9", intervals = { 0, 4, 7, 10, 13 } },
+  { id = "maj7#11", symbol = "maj7#11", numeral = "maj7#11", intervals = { 0, 4, 7, 11, 18 } },
+  { id = "add11", symbol = "add11", numeral = "add11", intervals = { 0, 4, 7, 17 } },
 }
 
 ---@class Mode
@@ -251,16 +266,21 @@ end
 ---counts, so the major V and V7 everybody plays are in key). `borrowed`: every
 ---tone is in the parallel major/minor scale, or the root is in the scale but a
 ---tone is not (secondary dominants and the like). `out`: anything else.
+---A bass note that is not a chord tone (F/G) counts as one more tone.
 ---@param root integer 0-11
 ---@param type_index integer 1..#CHORD_TYPES
 ---@param key integer 0-11
 ---@param mode integer 1-7
+---@param bass integer? 0-11 pitch class of a slash bass; nil or negative = none
 ---@return ChordAnalysis
-function M.analyze(root, type_index, key, mode)
+function M.analyze(root, type_index, key, mode, bass)
   local chord = M.CHORD_TYPES[type_index]
   local tones = {}
   for i, interval in ipairs(chord.intervals) do
     tones[i] = (root + interval) % 12
+  end
+  if bass and bass >= 0 then
+    tones[#tones + 1] = bass % 12
   end
   local scale = M.scale(key, mode)
   local func

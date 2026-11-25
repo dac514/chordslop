@@ -98,6 +98,43 @@ t.eq(an(2, "maj", 0, 1), "II|borrowed", "D major in C: root in key, tone out")
 t.eq(an(1, "maj", 0, 1), "bII|out", "Db major in C is out")
 t.eq(an(9, "min", 9, 6), "i|in_key", "Am in A minor")
 t.eq(an(7, "maj", 9, 6), "VII|in_key", "G in A minor is diatonic VII")
+
+-- the first sixteen chord types keep their index (saved pads store it)
+local OLD_IDS = { "maj", "min", "dim", "aug", "sus2", "sus4", "maj7", "min7" }
+for i, id in ipairs(OLD_IDS) do
+  t.eq(theory.CHORD_TYPES[i].id, id, "chord type index " .. i)
+end
+local MORE_OLD = { "dom7", "dim7", "m7b5", "mmaj7", "6", "m6", "add9", "5" }
+for i, id in ipairs(MORE_OLD) do
+  t.eq(theory.CHORD_TYPES[8 + i].id, id, "chord type index " .. (8 + i))
+end
+
+-- extended chords
+t.eq(an(2, "m9", 0, 1), "ii9|in_key", "Dm9 in C: lower case, the third is minor")
+t.eq(an(2, "m11", 0, 1), "ii11|in_key", "Dm11 in C")
+t.eq(an(0, "maj9", 0, 1), "Imaj9|in_key", "Cmaj9 in C")
+t.eq(an(7, "13", 0, 1), "V13|in_key", "G13 in C")
+t.eq(an(7, "9sus4", 0, 1), "V9sus4|in_key", "G9sus4 in C")
+t.eq(an(5, "maj7#11", 0, 1), "IVmaj7#11|in_key", "Fmaj7#11 in C")
+t.eq(an(4, "7b9", 9, 6), "V7b9|in_key", "E7b9 in A minor: harmonic minor")
+t.eq(an(7, "7b9", 0, 1), "V7b9|borrowed", "G7b9 in C: Ab is out")
+t.eq(an(4, "m9", 0, 1), "iii9|borrowed", "Em9 in C: F# is out")
+t.eq(an(9, "madd9", 0, 1), "viadd9|in_key", "Amadd9 in C")
+for i, chord in ipairs(theory.CHORD_TYPES) do
+  for j = 2, #chord.intervals do
+    t.check(chord.intervals[j] > chord.intervals[j - 1], chord.id .. " intervals ascend")
+  end
+  t.eq(theory.type_index(chord.id), i, chord.id .. " id is unique")
+end
+
+-- a slash bass counts as a chord tone
+local function slash(root, id, key, mode, bass)
+  local a = theory.analyze(root, assert(theory.type_index(id)), key, mode, bass)
+  return a.numeral .. "|" .. a.func
+end
+t.eq(slash(5, "maj", 0, 1, 7), "IV|in_key", "F/G in C")
+t.eq(slash(5, "maj", 0, 1, 6), "IV|borrowed", "F/F# in C: the bass is out")
+t.eq(slash(5, "maj", 0, 1, -1), "IV|in_key", "a negative bass means none")
 t.eq(an(4, "maj", 9, 6), "V|in_key", "E major in A minor counts as in key (harmonic minor)")
 t.eq(an(4, "dom7", 9, 6), "V7|in_key", "E7 in A minor counts as in key")
 t.eq(an(9, "mmaj7", 9, 6), "imMaj7|in_key", "A minor-major seventh is harmonic minor")

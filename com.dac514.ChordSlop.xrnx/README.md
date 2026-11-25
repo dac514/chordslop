@@ -96,13 +96,14 @@ Phrygian, Lydian, Mixolydian, power chords and suspended chords. Some play
 every chord over one held bass note, for plucks and arpeggiators.
 
 - Many rows are a progression that you play from left to right.
-- No two pads play the same notes. A chord that returns uses another bass
-  note, inversion or extension.
+- In the preset's own mode, no two pads play the same notes. A chord that
+  returns uses another bass note, inversion or extension.
 - Presets follow the key, and most of them set their own mode. In that mode,
   every pad is green.
 - If you change the mode later, ChordSlop builds the preset again in the new
   mode. The jazz ii V I becomes a minor ii V i. Ninths and elevenths follow
-  the mode too, and become sevenths where the mode has no such chord.
+  the mode too, and become sevenths where the mode has no such chord. So two
+  pads can then play the same chord.
 
 After you edit a pad, the preset name gets an asterisk. Choose the preset
 again to restore it. *Save* stores your own layout under a name, and *Delete*

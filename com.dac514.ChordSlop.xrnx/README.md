@@ -50,7 +50,8 @@ roman numeral and its computer key. Click a pad to select it. The editor under
 the grid changes its root, chord type, bass, inversion and octave.
 
 The keyboard under the editor shows the notes of the selected pad. While pads
-play, it shows their notes instead. The bass note is amber.
+play, it shows their notes instead. The bass note is amber. The keyboard spans
+C-1 to B-7, and an arrow at either end marks notes beyond it.
 
 **Chord types.** Besides triads, sixths and sevenths, the pads play ninths
 (maj9, m9, 9), the minor eleventh (m11), the thirteenth (13), suspended
@@ -78,7 +79,8 @@ their notes.
   how earlier versions of ChordSlop played every chord.
 
 The octave of a pad moves all its notes. At octave 4, the bass of *Open* and
-*Wide* is between C-3 and B-3.
+*Wide* is between C-3 and B-3. At the ends of the note range, a chord moves by
+whole octaves, so it keeps its shape.
 
 **Key and mode.** Choose a root note and one of seven modes. When *Transpose
 pads with key* is on, the pads move with the key. When it is off, the pads

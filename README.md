@@ -29,8 +29,9 @@ just reload      # reinstall after edits
 just package     # dist/com.dac514.ChordSlop.xrnx
 ```
 
-The music theory, pad model, circle geometry, MIDI/QWERTY decoding, recording
-placement and presets are pure Lua modules under `src/` with tests in `tests/`.
+The music theory, pad model, voicings, circle geometry, keyboard geometry,
+MIDI/QWERTY decoding, recording placement and presets are pure Lua modules
+under `src/` with tests in `tests/`.
 Only `app.lua`, `ui.lua`, `player.lua`, `store.lua` and `anim.lua` talk to Renoise.
 
 See [CLAUDE.md](CLAUDE.md) for the full development notes.

@@ -28,6 +28,7 @@ end
 ---@field near RGB Next door: the chords of the closely related keys.
 ---@field learn RGB Accent for armed states such as MIDI learn.
 ---@field out RGB `{0,0,0}` means "theme default" for a Renoise button
+---@field base RGB The theme's button colour (or the default) the palette is built around.
 ---@field highlight fun(color: RGB): RGB Brightened version for the selected pad
 
 M.GREEN = { 60, 170, 90 }
@@ -46,6 +47,7 @@ function M.palette(button_back)
     near = M.blend(base, M.BLUE, M.MIX),
     learn = M.blend(base, M.AMBER, M.MIX),
     out = { 0, 0, 0 },
+    base = base,
   }
   function palette.highlight(color)
     local from = (color[1] == 0 and color[2] == 0 and color[3] == 0) and base or color

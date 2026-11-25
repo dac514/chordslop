@@ -5,7 +5,7 @@
 
   Layout (about 960 x 520):
     header   key, mode, transpose pads | presets
-    body     circle of fifths panel    | 4x4 pad grid, pad editor, notes and fit line
+    body     circle of fifths panel    | 4x4 pad grid, pad editor with keyboard, voicing and fit line
     footer   MIDI device, pad 1 note, learn | QWERTY, animate | status
 ]]
 
@@ -18,6 +18,8 @@ local input = require "src.input"
 local circle = require "src.circle"
 local anim = require "src.anim"
 local presets = require "src.presets"
+local voicing = require "src.voicing"
+local keyboard = require "src.keyboard"
 
 local M = {}
 
@@ -29,8 +31,17 @@ local PAD_W, PAD_H, PAD_GAP = 122, 64, 6
 local GRID_COLS, GRID_ROWS = 4, 4
 local GRID_W = GRID_COLS * PAD_W + (GRID_COLS - 1) * PAD_GAP
 local LABEL_H = renoise.ViewBuilder.DEFAULT_CONTROL_HEIGHT
-local CIRCLE_SIZE = 400
+local CIRCLE_SIZE = 450
 local CIRCLE_W = CIRCLE_SIZE + 2 * renoise.ViewBuilder.DEFAULT_DIALOG_SPACING -- circle_panel incl. margin
+local EDITOR_W = GRID_W - 2 * GAP -- inside the editor group's margin
+
+-- The keyboard under the pad editor: C-1 .. B-7, seven octaves.
+local KB_LOW, KB_HIGH = 12, 95
+local KB_WHITE_W, KB_BLACK_W = 10, 6
+local KB_W = keyboard.white_count(KB_LOW, KB_HIGH) * KB_WHITE_W
+local KB_H, KB_BLACK_H = 34, 21
+---Pad names longer than this use a smaller font so they fit the pad.
+local BIG_NAME_MAX = 8
 
 ---Held-note slots for things that are not pads (ring and centre buttons).
 local HELD_OUTER, HELD_INNER, HELD_CENTER = 100, 200, 300
@@ -79,6 +90,18 @@ local TIP_PRESET_BASE = "Presets are ready-made layouts of 16 chords; pick one a
 local TIP_MIDI_BASE = "The lowest MIDI note of the controller pads; the 16 pads answer to this note and the "
   .. "15 above it, arranged by the layout next to it. Default C-3 (note 36) is pad 1 of bank A on an AKAI "
   .. "MPK mini. Or press Learn and hit that pad."
+local TIP_VOICING = "How a pad's chord is spread over the keyboard.\n\n"
+  .. "Close: the chord stacked from its root in one octave, with no bass.\n"
+  .. "Open: a bass note in the octave below, and the chord above it in a fixed register. "
+  .. "Chords of four or more notes leave out the note the bass plays, so the sound stays clear, "
+  .. "and the top note moves only a little from pad to pad.\n"
+  .. "Wide: like Open, with the fifth and the octave above the bass, for pads and strings."
+local TIP_BASS = "Bass note of the selected pad. Inversion: the chord tone that the inversion puts lowest. "
+  .. "A note here makes a slash chord, such as F/G: in Open and Wide it replaces the bass, "
+  .. "in Close it sounds an octave below the chord."
+local TIP_KEYBOARD = "The notes of the selected pad, or of the pads that sound right now. "
+  .. "The bass is amber."
+
 local TIP_LAYOUT = "How the 16 controller notes land on the grid. Rows top to bottom: lowest note top-left. "
   .. "Rows bottom to top: lowest note bottom-left, like a drum machine. MPK mini banks: bank A on the top "
   .. "two rows and bank B below, each laid out like the controller (pads 1-4 bottom, 5-8 top)."
@@ -106,6 +129,16 @@ local function type_items()
   local items = { "(empty)" }
   for i, chord in ipairs(theory.CHORD_TYPES) do
     items[i + 1] = chord.id
+  end
+  return items
+end
+
+---Bass popup items: the inversion decides, or one of the twelve notes.
+---@return string[]
+local function bass_items()
+  local items = { "Inversion" }
+  for i, name in ipairs(KEY_ITEMS) do
+    items[i + 1] = name
   end
   return items
 end
@@ -212,11 +245,117 @@ function M.build(app, palette)
   local syncing = false -- true while the code (not the user) sets control values
   ---@type fun()
   local refresh_circle
+  ---@type fun() Redraw the keyboard (defined with the keyboard below).
+  local refresh_keyboard
   ---@type fun() The pads no longer are the preset they came from (defined with the presets).
   local mark_dirty
 
   local function flats()
     return theory.prefers_flats(ctl.key, ctl.mode)
+  end
+
+  ---@return integer voicing style index
+  local function style()
+    return voicing.style(prefs.voicing.value)
+  end
+
+  -- Keyboard -------------------------------------------------------------------
+
+  local KEY_WHITE = colors.blend(palette.base, { 255, 255, 255 }, 0.72)
+  local KEY_BLACK = colors.blend(palette.base, { 0, 0, 0 }, 0.55)
+  local KEY_BASS = colors.blend(colors.AMBER, { 255, 255, 255 }, 0.1)
+
+  ---@class KeyboardState
+  ---@field lit table<integer, RGB> colour by note
+  ---@field bass table<integer, boolean>
+  local kb = { lit = {}, bass = {} }
+
+  ---Colour of the upper notes of a pad: its circle colour, made strong
+  ---enough to stand out on the light keys.
+  ---@param pad Pad
+  ---@return RGB
+  local function key_color(pad)
+    local hue = colors.GREEN
+    if not pads_mod.is_empty(pad) then
+      local level = circle.pad_level(pad, ctl.key, ctl.mode)
+      if level == "near" then
+        hue = colors.BLUE
+      elseif level ~= "home" then
+        hue = { 150, 150, 160 }
+      end
+    end
+    return hue
+  end
+
+  ---Light the notes of one chord: its lowest note is the bass when it sounds
+  ---apart from the chord (Open, Wide, or a slash bass in Close).
+  ---@param pad Pad
+  ---@param notes integer[]
+  local function light(pad, notes)
+    local color = key_color(pad)
+    local separate = style() ~= voicing.CLOSE or voicing.has_bass(pad)
+    for n, note in ipairs(notes) do
+      if n == 1 and separate then
+        kb.bass[note] = true
+        kb.lit[note] = KEY_BASS
+      elseif not kb.bass[note] then
+        kb.lit[note] = color
+      end
+    end
+  end
+
+  ---Pads that sound by pad index, so the keyboard can show them.
+  ---@type table<integer, Pad>
+  local sounding = {}
+
+  function refresh_keyboard()
+    kb.lit, kb.bass = {}, {}
+    local any = false
+    for index, pad in pairs(sounding) do
+      local held = player.held[index]
+      if held then
+        light(pad, held.notes)
+        any = true
+      end
+    end
+    if not any then
+      local pad = ctl.pads[ctl.selected]
+      light(pad, pads_mod.notes(pad, style()))
+    end
+    local canvas = vb.views.keys --[[@as renoise.Views.Canvas?]]
+    if canvas then
+      canvas:update()
+    end
+  end
+
+  ---@param ctx renoise.Views.Canvas.Context
+  local function draw_keyboard(ctx)
+    ctx:clear_rect(0, 0, KB_W, KB_H)
+    -- white keys, with a one pixel gap between them
+    for note = KB_LOW, KB_HIGH do
+      if not keyboard.is_black(note) then
+        local x = keyboard.key_x(note, KB_LOW, KB_WHITE_W, KB_BLACK_W)
+        ctx.fill_color = kb.lit[note] or KEY_WHITE
+        ctx:begin_path()
+        ctx:rect(x, 0, KB_WHITE_W - 1, KB_H)
+        ctx:fill()
+      end
+    end
+    -- black keys on top
+    for note = KB_LOW, KB_HIGH do
+      if keyboard.is_black(note) then
+        local x, w = keyboard.key_x(note, KB_LOW, KB_WHITE_W, KB_BLACK_W)
+        ctx.fill_color = kb.lit[note] or KEY_BLACK
+        ctx:begin_path()
+        ctx:rect(x, 0, w, KB_BLACK_H)
+        ctx:fill()
+      end
+    end
+    -- a thin shadow under the frame, like the key bed of a real piano
+    ctx.fill_color = { 0, 0, 0, 90 }
+    ctx:begin_path()
+    ctx:rect(0, 0, KB_W, 2)
+    ctx:fill()
   end
 
   -- Pads ---------------------------------------------------------------------
@@ -234,6 +373,7 @@ function M.build(app, palette)
       color = palette.highlight(color)
     end
     button.text = name
+    button.font = #name > BIG_NAME_MAX and "bold" or "big"
     button.color = color
     button.tooltip = ("Pad %d · key %s · MIDI %s"):format(
       i,
@@ -259,18 +399,21 @@ function M.build(app, palette)
     root.value = pad.root + 1
     local kind = vb.views.pad_type --[[@as renoise.Views.Popup]]
     kind.value = pad.type + 1
+    local bass = vb.views.pad_bass --[[@as renoise.Views.Popup]]
+    bass.value = (pad.bass or -1) + 2
     local inv = vb.views.pad_inv --[[@as renoise.Views.ValueBox]]
     inv.value = pad.inversion
     local oct = vb.views.pad_oct --[[@as renoise.Views.ValueBox]]
     oct.value = pad.octave
-    local notes = pads_mod.notes(pad)
+    local notes = pads_mod.notes(pad, style())
     local names = {}
     for n, note in ipairs(notes) do
       names[n] = note_label(note)
     end
     local preview = vb.views.editor_notes --[[@as renoise.Views.Text]]
-    preview.text = #names > 0 and table.concat(names, "  ") or "empty"
+    preview.text = #names > 0 and table.concat(names, " ") or "empty"
     syncing = false
+    refresh_keyboard()
   end
 
   local function refresh_key_label()
@@ -356,15 +499,19 @@ function M.build(app, palette)
   function ctl.press(i, velocity, from_midi)
     player.press(i, ctl.pads[i], velocity, from_midi)
     active[i] = true
+    sounding[i] = ctl.pads[i]
     refresh_pad(i)
     refresh_ring_for_pad(i)
+    refresh_keyboard()
   end
 
   function ctl.release(i)
     player.release(i)
     active[i] = nil
+    sounding[i] = nil
     refresh_pad(i)
     refresh_ring_for_pad(i)
+    refresh_keyboard()
   end
 
   ---@param update fun(pad: Pad)
@@ -783,13 +930,19 @@ function M.build(app, palette)
     ring_active[ring_key] = true
     refresh_ring(k, ring)
     refresh_pads_on_ring(ring_key)
-    player.press((ring == "outer" and HELD_OUTER or HELD_INNER) + k, pad, nil, false)
+    local held = (ring == "outer" and HELD_OUTER or HELD_INNER) + k
+    player.press(held, pad, nil, false)
+    sounding[held] = pad
+    refresh_keyboard()
   end
 
   ---@param k integer
   ---@param ring "outer"|"inner"
   local function ring_released(k, ring)
-    player.release((ring == "outer" and HELD_OUTER or HELD_INNER) + k)
+    local held = (ring == "outer" and HELD_OUTER or HELD_INNER) + k
+    player.release(held)
+    sounding[held] = nil
+    refresh_keyboard()
     local ring_key = ("%s_%d"):format(ring, k)
     ring_active[ring_key] = nil
     refresh_ring(k, ring)
@@ -914,10 +1067,15 @@ function M.build(app, palette)
     style = "rounded",
     font = "bold",
     pressed = app.guard(function()
-      player.press(HELD_CENTER, tonic_pad(), nil, false)
+      local pad = tonic_pad()
+      player.press(HELD_CENTER, pad, nil, false)
+      sounding[HELD_CENTER] = pad
+      refresh_keyboard()
     end),
     released = app.guard(function()
       player.release(HELD_CENTER)
+      sounding[HELD_CENTER] = nil
+      refresh_keyboard()
     end),
   })
 
@@ -1085,13 +1243,11 @@ function M.build(app, palette)
     },
   }
 
-  -- An aligner, because a plain row shrinks to its content and would end short of the grid.
-  local editor = vb:horizontal_aligner {
-    id = "editor",
+  -- Aligners, because a plain row shrinks to its content and would end short of the grid.
+  local editor_top = vb:horizontal_aligner {
+    id = "editor_top",
     mode = "justify",
-    background = "group",
-    margin = GAP,
-    size = { width = GRID_W, height = LABEL_H + 2 * GAP },
+    width = EDITOR_W,
     vb:text { id = "editor_title", font = "bold", width = 44, tooltip = "The selected pad" },
     vb:row {
       spacing = SPACING,
@@ -1116,7 +1272,7 @@ function M.build(app, palette)
       vb:text { text = "Type", style = "disabled" },
       vb:popup {
         id = "pad_type",
-        width = 76,
+        width = 84,
         items = type_items(),
         tooltip = "Chord type of the selected pad",
         notifier = app.guard(function(value)
@@ -1128,45 +1284,110 @@ function M.build(app, palette)
     },
     vb:row {
       spacing = SPACING,
+      vb:text { text = "Bass", style = "disabled", tooltip = TIP_BASS },
+      vb:popup {
+        id = "pad_bass",
+        width = 84,
+        items = bass_items(),
+        tooltip = TIP_BASS,
+        notifier = app.guard(function(value)
+          edit_selected(function(pad)
+            pad.bass = value - 2
+          end)
+        end),
+      },
+    },
+  }
+
+  local editor_bottom = vb:horizontal_aligner {
+    id = "editor_bottom",
+    mode = "justify",
+    width = EDITOR_W,
+    vb:text {
+      id = "editor_notes",
+      style = "disabled",
+      font = "mono",
+      tooltip = "The notes the selected pad plays, lowest first",
+    },
+    vb:row {
+      spacing = SPACING,
       vb:text { text = "Inv", style = "disabled" },
       vb:valuebox {
         id = "pad_inv",
         width = 50,
         min = 0,
         max = pads_mod.MAX_INVERSION,
-        tooltip = "Inversion: how many of the lowest chord tones move up an octave",
+        tooltip = "Inversion: which chord tone is lowest (0 root, 1 third, 2 fifth, 3 seventh). A Bass note overrides it in Open and Wide.",
         notifier = app.guard(function(value)
           edit_selected(function(pad)
             pad.inversion = value
           end)
         end),
       },
-    },
-    vb:row {
-      spacing = SPACING,
+      vb:space { width = GAP },
       vb:text { text = "Oct", style = "disabled" },
       vb:valuebox {
         id = "pad_oct",
         width = 50,
         min = pads_mod.MIN_OCTAVE,
         max = pads_mod.MAX_OCTAVE,
-        tooltip = "Octave of the chord root (4 = C-4 territory)",
+        tooltip = "Octave of the chord (4: the bass at C-3..B-3 in Open and Wide, the root at C-4 in Close)",
         notifier = app.guard(function(value)
           edit_selected(function(pad)
             pad.octave = value
           end)
         end),
       },
+      vb:space { width = GAP },
+      vb:button {
+        id = "pad_clear",
+        text = "Clear",
+        tooltip = "Empty the selected pad",
+        notifier = app.guard(function()
+          edit_selected(function(pad)
+            pad.type = 0
+            pad.bass = pads_mod.NO_BASS
+          end)
+        end),
+      },
     },
-    vb:button {
-      id = "pad_clear",
-      text = "Clear",
-      tooltip = "Empty the selected pad",
-      notifier = app.guard(function()
-        edit_selected(function(pad)
-          pad.type = 0
-        end)
-      end),
+  }
+
+  -- Octave names under every C of the keyboard.
+  local octave_labels = vb:row { id = "keys_octaves", spacing = 0 }
+  for note = KB_LOW, KB_HIGH, 12 do
+    octave_labels:add_view(vb:text {
+      width = 7 * KB_WHITE_W,
+      height = 14,
+      style = "disabled",
+      font = "mono",
+      text = note_label(note),
+    })
+  end
+
+  local editor = vb:column {
+    id = "editor",
+    style = "group",
+    margin = GAP,
+    spacing = SPACING,
+    width = GRID_W,
+    editor_top,
+    editor_bottom,
+    vb:space { height = 2 },
+    vb:horizontal_aligner {
+      mode = "center",
+      width = EDITOR_W,
+      vb:column {
+        spacing = 0,
+        vb:canvas {
+          id = "keys",
+          size = { width = KB_W, height = KB_H },
+          mode = "transparent",
+          tooltip = TIP_KEYBOARD,
+          render = app.guard(draw_keyboard),
+        },
+        octave_labels,
+      },
     },
   }
 
@@ -1175,15 +1396,23 @@ function M.build(app, palette)
     spacing = GAP,
     grid,
     editor,
-    vb:horizontal_aligner { -- the selected pad's notes on the left, all pads against the key on the right
+    vb:horizontal_aligner { -- the voicing on the left, all pads against the key on the right
       id = "pads_footer",
       mode = "justify",
       width = GRID_W,
-      vb:text {
-        id = "editor_notes",
-        style = "disabled",
-        font = "mono",
-        tooltip = "The notes the selected pad plays, lowest first",
+      vb:row {
+        spacing = SPACING,
+        vb:text { text = "Voicing", style = "disabled", tooltip = TIP_VOICING },
+        vb:switch {
+          id = "voicing",
+          width = 180,
+          items = voicing.STYLES,
+          bind = prefs.voicing,
+          tooltip = TIP_VOICING,
+          notifier = app.guard(function()
+            refresh_editor()
+          end),
+        },
       },
       vb:row {
         spacing = SPACING,

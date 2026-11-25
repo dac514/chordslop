@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Draw cover.png (600x350) and thumbnail.png (120x45) for renoise.com.
 
-Input is a capture of the ChordSlop dialog (from `just screenshot`), in C major
-with the first preset loaded and no pad of the first row selected. Needs
-Pillow. See scripts/cover/README.md.
+Input is a capture of the ChordSlop dialog (from capture.py), in C major with
+the first preset loaded and no pad of the first row selected. Needs Pillow.
+See scripts/cover/README.md, or run `just cover`.
 
-    python3 scripts/cover/compose.py dist/screenshot-...-2.png dist/cover
+    python3 scripts/cover/compose.py dist/cover/window.png dist/cover
 """
 
 import argparse
 import os
+import re
 import sys
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
@@ -22,7 +24,18 @@ GREEN = (98, 193, 126)
 GREY = (160, 160, 160)
 DIM = (120, 120, 120)
 
-CIRCLE_SIZE = 400  # CIRCLE_SIZE in src/ui.lua
+UI_LUA = Path(__file__).resolve().parents[2] / "com.dac514.ChordSlop.xrnx" / "src" / "ui.lua"
+
+
+def circle_size():
+    """CIRCLE_SIZE from src/ui.lua, so a layout change needs no edit here."""
+    m = re.search(r"^local CIRCLE_SIZE = (\d+)", UI_LUA.read_text(), re.M)
+    if not m:
+        sys.exit("error CIRCLE_SIZE not found in %s" % UI_LUA)
+    return int(m.group(1))
+
+
+CIRCLE_SIZE = circle_size()
 R_OUTER = 0.42  # circle.layout: label ring radius, as a share of the size
 R_EDGE = 0.49  # circle.layout: disc edge
 
@@ -57,7 +70,7 @@ def find_circle(src):
     """
     px = src.load()
     for y in range(src.height):
-        xs = [x for x in range(min(src.width, 440)) if _greenish(px[x, y])]
+        xs = [x for x in range(min(src.width, CIRCLE_SIZE + 30)) if _greenish(px[x, y])]
         if xs:
             return round((min(xs) + max(xs)) / 2 - CIRCLE_SIZE / 2), y
     sys.exit("error tonic marker not found; is the dialog in the capture?")
@@ -65,6 +78,29 @@ def find_circle(src):
 
 def _greenish(c):
     return c[1] > c[0] + 35 and c[1] > c[2] + 25
+
+
+def find_pads(src, circle):
+    """The first pad row: the first band of green right of the circle.
+
+    The first preset fills the top row with green pads, so the first pixel
+    rows with many green pixels right of the circle are that row.
+    """
+    px = src.load()
+    left = circle[0] + CIRCLE_SIZE + 20
+    band = []
+    for y in range(src.height):
+        xs = [x for x in range(left, src.width) if _greenish(px[x, y])]
+        if len(xs) > 100:
+            band.append((y, min(xs), max(xs)))
+        elif band:
+            break
+    if not band:
+        sys.exit("error first pad row not found; pass --pads x,y,w,h")
+    top, bottom = band[0][0], band[-1][0]
+    x0 = min(b[1] for b in band)
+    x1 = max(b[2] for b in band)
+    return x0, top, x1 - x0 + 1, bottom - top + 1
 
 
 def sample(src, cx, cy, k, dx):
@@ -165,13 +201,12 @@ def main():
     ap.add_argument("out", help="folder for cover.png and thumbnail.png")
     ap.add_argument(
         "--pads",
-        default="446,65,504,61",
-        help="first pad row inside the capture: x,y,w,h (default %(default)s)",
+        help="first pad row inside the capture: x,y,w,h (default: found from its colour)",
     )
     args = ap.parse_args()
     src = Image.open(args.capture).convert("RGB")
     circle = find_circle(src)
-    pads = tuple(int(v) for v in args.pads.split(","))
+    pads = tuple(int(v) for v in args.pads.split(",")) if args.pads else find_pads(src, circle)
     cx, cy = circle
     colors = {
         "home": sample(src, cx, cy, 0, 18),  # C
@@ -181,7 +216,8 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     cover(src, circle, pads, colors).save(os.path.join(args.out, "cover.png"))
     thumbnail(src, circle).save(os.path.join(args.out, "thumbnail.png"))
-    print(f"ok circle at {circle}, colours {colors}, wrote {args.out}/cover.png and thumbnail.png")
+    print(f"ok circle at {circle}, pads at {pads}, colours {colors}")
+    print(f"wrote {args.out}/cover.png and {args.out}/thumbnail.png")
 
 
 if __name__ == "__main__":

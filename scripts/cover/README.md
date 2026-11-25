@@ -1,21 +1,33 @@
 # Cover and thumbnail
 
-`compose.py` draws the renoise.com images: `cover.png` (600x350) and
-`thumbnail.png` (120x45). It needs Python 3 and Pillow, and it works on every
-platform.
+These scripts draw the renoise.com images: `cover.png` (600x350) and
+`thumbnail.png` (120x45). They need Python 3 and Pillow, and they work on
+Linux, Windows and macOS.
 
-1. Open the ChordSlop dialog in C major, with the first preset loaded. Select
-   a pad outside the first row, so that no pad in that row is highlighted:
-   `just eval 'APP.ctl.selected = 16; APP.ctl.refresh_all()'`.
-2. Capture the dialog. On Linux, `just screenshot` writes one PNG for each
-   Renoise window, and the dialog is the file that ends in `-2.png`. On
-   Windows, run
-   `powershell -ExecutionPolicy Bypass -File scripts/cover/capture.ps1 dist\cover`,
-   which writes `dist\cover\window.png`.
-3. Run `python3 scripts/cover/compose.py <capture.png> dist/cover`.
-4. Check both images, then copy them to the bundle root.
+With Renoise running and the tool installed, run:
 
-The script finds the circle of fifths from the green tonic marker. It also
-reads the three colours from the circle buttons C, D and Eb. The first pad
-row sits at `446,65,504,61` in the capture. If the layout changes, pass the
-new position with `--pads x,y,w,h`. `just views` shows the sizes of the views.
+```
+just cover
+```
+
+It does three things:
+
+1. `just eval @scripts/cover/setup.lua` opens the dialog and sets it up: C
+   major, the first preset, the Open voicing, and pad 16 selected, so that no
+   pad in the first row is highlighted. This changes your pads.
+2. `capture.py dist/cover/window.png` captures only the ChordSlop window.
+   - Linux: it finds the window with `xprop` and grabs it with ImageMagick's
+     `import`. Renoise is an X11 program, so this also works under Wayland.
+   - Windows: it finds the window by its title and grabs it with Pillow.
+   - macOS: it asks System Events for the window position, so the terminal
+     needs the Accessibility permission. It grabs it with `screencapture`.
+   - WSL cannot see Windows windows. Run the scripts with Windows Python.
+3. `compose.py dist/cover/window.png dist/cover` draws both images.
+
+Check both images in `dist/cover`, then copy them to the bundle root.
+
+`compose.py` reads `CIRCLE_SIZE` from `src/ui.lua`. It finds the circle of
+fifths from the green tonic marker, and the first pad row from its green
+pads. It reads the three colours from the circle buttons C, D and Eb. If the
+pad row is not found, pass its position with `--pads x,y,w,h`. `just views`
+shows the sizes of the views.

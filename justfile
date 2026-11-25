@@ -78,6 +78,12 @@ song:
 screenshot *ARGS:
     {{rn}} screenshot {{ARGS}}
 
+# Draw cover.png and thumbnail.png for renoise.com into dist/cover (sets up the open dialog)
+cover:
+    {{rn}} eval @scripts/cover/setup.lua
+    {{python}} scripts/cover/capture.py dist/cover/window.png
+    {{python}} scripts/cover/compose.py dist/cover/window.png dist/cover
+
 # Zip the tool into dist/<Id>.xrnx without dev/
 package:
     {{rn}} package

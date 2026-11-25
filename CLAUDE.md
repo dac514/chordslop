@@ -36,6 +36,7 @@ first line; exit codes: 0 ok, 1 remote/Lua error, 2 usage, 3 cannot connect,
 | `just log` | last prints, errors, bridge messages from inside the tool (`-n 100`, `--clear`) |
 | `just song` | one-screen summary of the current song |
 | `just screenshot` | PNGs into `dist/`: on X11/XWayland one per Renoise window (dialogs are `-2`, `-3`...), whole screen elsewhere; then Read them |
+| `just cover` | set up the open dialog, capture it and draw `dist/cover/cover.png` and `thumbnail.png` for renoise.com (Pillow; Linux, Windows, macOS) |
 | `just package` | distributable `dist/<Id>.xrnx` without `dev/` and `preferences.xml` |
 | `just init com.you.Name "Name" ["You [you@x.com]"]` | rename the template placeholder once |
 | `just update-defs` | refresh `definitions/` and `docs/renoise/` from GitHub |
@@ -85,7 +86,7 @@ docs/renoise/                 vendored xrnx guide pages (start/, guide/)
 .github/workflows/ci.yml      stylua --check, lua-language-server --check, unit tests, package
 .github/workflows/release.yml tag v* -> GitHub release with the .xrnx attached
 <Id>.xrnx/manifest.xml        Id, Version, ApiVersion (rules under Hard constraints)
-<Id>.xrnx/cover.png           optional renoise.com cover (600x350), with thumbnail.png (120x45)
+<Id>.xrnx/cover.png           optional renoise.com cover (600x350), with thumbnail.png (120x45); `just cover` redraws both (scripts/cover/)
 <Id>.xrnx/main.lua            thin entry: package.path, preferences schema (ChordSlopPreset model, then ChordSlopPreferences), APP.start(), dev bridge
 <Id>.xrnx/src/app.lua         App.start/stop, App.reg (menu/key/notifier/timer/midi), dialog key/focus/watch handlers, App.guard, App.defer
 <Id>.xrnx/src/ui.lua          ViewBuilder dialog: header, circle-of-fifths stack (canvas + ring buttons), 4x4 pads, editor with keyboard canvas, voicing switch, footer; returns (vb, root, ctl)

@@ -1,10 +1,12 @@
 --[[
-  The pad model: sixteen pads, each a chord (root, type, inversion, octave).
-  Pure Lua; `src/store.lua` moves pads in and out of the preferences and
+  The pad model: sixteen pads, each a chord (root, type, inversion, octave)
+  with an optional slash bass. Pure Lua; `src/store.lua` moves pads in and
+  out of the preferences, `src/voicing.lua` turns them into notes and
   `src/ui.lua` draws them.
 ]]
 
 local theory = require "src.theory"
+local voicing = require "src.voicing"
 
 local M = {}
 
@@ -13,16 +15,18 @@ local M = {}
 ---@field type integer 0 = empty, else index into theory.CHORD_TYPES
 ---@field inversion integer 0-3
 ---@field octave integer 0-9
+---@field bass integer? -1 or nil = the chord tone the inversion puts lowest, else a 0-11 pitch class
 
 M.COUNT = 16
 M.MAX_INVERSION = 3
 M.MIN_OCTAVE = 0
 M.MAX_OCTAVE = 9
 M.DEFAULT_OCTAVE = 4
+M.NO_BASS = -1
 
 ---@return Pad
 function M.empty()
-  return { root = 0, type = 0, inversion = 0, octave = M.DEFAULT_OCTAVE }
+  return { root = 0, type = 0, inversion = 0, octave = M.DEFAULT_OCTAVE, bass = M.NO_BASS }
 end
 
 ---@param pad Pad
@@ -59,11 +63,13 @@ function M.normalize(pad)
     type = int_in(pad.type, 0, #theory.CHORD_TYPES, 0),
     inversion = int_in(pad.inversion, 0, M.MAX_INVERSION, 0),
     octave = int_in(pad.octave, M.MIN_OCTAVE, M.MAX_OCTAVE, M.DEFAULT_OCTAVE),
+    bass = int_in(pad.bass, M.NO_BASS, 11, M.NO_BASS),
   }
 end
 
 ---Transpose every pad by `delta` semitones. The root wraps and the octave
----carries, clamped to the valid range. Empty pads are left alone.
+---carries, clamped to the valid range; a slash bass moves with the root.
+---Empty pads are left alone.
 ---@param pads Pad[]
 ---@param delta integer
 ---@return Pad[]
@@ -80,7 +86,17 @@ function M.transpose(pads, delta)
       elseif octave > M.MAX_OCTAVE then
         octave = M.MAX_OCTAVE
       end
-      out[i] = { root = absolute % 12, type = pad.type, inversion = pad.inversion, octave = octave }
+      local bass = M.NO_BASS
+      if voicing.has_bass(pad) then
+        bass = (pad.bass + delta) % 12
+      end
+      out[i] = {
+        root = absolute % 12,
+        type = pad.type,
+        inversion = pad.inversion,
+        octave = octave,
+        bass = bass,
+      }
     end
   end
   return out
@@ -97,7 +113,7 @@ function M.fit(pads, key, mode)
   for _, pad in ipairs(pads) do
     if not M.is_empty(pad) then
       total = total + 1
-      if theory.analyze(pad.root, pad.type, key, mode).func == "in_key" then
+      if M.analyze(pad, key, mode).func == "in_key" then
         in_key = in_key + 1
       end
     end
@@ -128,26 +144,30 @@ function M.best_fit(pads, key, mode)
   return best_delta, best
 end
 
----Flatten pads into four plain number lists (what the preferences store).
+---Flatten pads into five plain number lists (what the preferences store).
 ---@param pads Pad[]
----@return integer[] roots, integer[] types, integer[] inversions, integer[] octaves
+---@return integer[] roots, integer[] types, integer[] inversions, integer[] octaves, integer[] basses
 function M.to_lists(pads)
-  local roots, types, inversions, octaves = {}, {}, {}, {}
+  local roots, types, inversions, octaves, basses = {}, {}, {}, {}, {}
   for i = 1, M.COUNT do
     local pad = M.normalize(pads[i])
     roots[i], types[i], inversions[i], octaves[i] = pad.root, pad.type, pad.inversion, pad.octave
+    basses[i] = pad.bass
   end
-  return roots, types, inversions, octaves
+  return roots, types, inversions, octaves, basses
 end
 
----Rebuild pads from four number lists. Always returns `COUNT` pads; missing or
----invalid entries become empty pads.
+---Rebuild pads from the number lists. Always returns `COUNT` pads; missing or
+---invalid entries become empty pads. Without a bass list (preferences from
+---before slash basses) no pad has a slash bass.
 ---@param roots integer[]
 ---@param types integer[]
 ---@param inversions integer[]
 ---@param octaves integer[]
+---@param basses integer[]?
 ---@return Pad[]
-function M.from_lists(roots, types, inversions, octaves)
+function M.from_lists(roots, types, inversions, octaves, basses)
+  basses = basses or {}
   local pads = {}
   for i = 1, M.COUNT do
     pads[i] = M.normalize {
@@ -155,24 +175,37 @@ function M.from_lists(roots, types, inversions, octaves)
       type = types[i],
       inversion = inversions[i],
       octave = octaves[i],
+      bass = basses[i],
     }
   end
   return pads
 end
 
----Notes a pad plays.
+---Notes a pad plays, lowest first.
 ---@param pad Pad
+---@param style integer? voicing.CLOSE, OPEN or WIDE; default voicing.DEFAULT
 ---@return integer[]
-function M.notes(pad)
+function M.notes(pad, style)
   if M.is_empty(pad) then
     return {}
   end
-  return theory.build_notes(pad.root, pad.type, pad.inversion, pad.octave)
+  return voicing.notes(pad, style)
+end
+
+---Analyse a pad against a key; a slash bass outside the key takes the pad out of it.
+---@param pad Pad
+---@param key integer 0-11
+---@param mode integer 1-7
+---@return ChordAnalysis
+function M.analyze(pad, key, mode)
+  local bass = voicing.has_bass(pad) and pad.bass or nil
+  return theory.analyze(pad.root, pad.type, key, mode, bass)
 end
 
 ---@alias PadFunction "in_key"|"borrowed"|"out"|"empty"
 
----Display strings for a pad in the given key.
+---Display strings for a pad in the given key. The name shows the bass after
+---a slash when the lowest note is not the root ("C/E", "F/G").
 ---@param pad Pad
 ---@param key integer 0-11
 ---@param mode integer 1-7
@@ -181,10 +214,17 @@ function M.label(pad, key, mode)
   if M.is_empty(pad) then
     return "", "", "empty"
   end
-  local analysis = theory.analyze(pad.root, pad.type, key, mode)
+  local analysis = M.analyze(pad, key, mode)
   -- Flattened degrees (bVII, bIII...) read as flats whatever the key prefers.
   local flats = theory.prefers_flats(key, mode) or analysis.numeral:sub(1, 1) == "b"
-  return theory.chord_name(pad.root, pad.type, flats), analysis.numeral, analysis.func
+  local name = theory.chord_name(pad.root, pad.type, flats)
+  local bass = voicing.bass_pc(pad)
+  if bass ~= pad.root then
+    -- a bass outside the key reads as a flat, like the flattened degrees
+    local bass_flats = flats or not theory.degree_of(bass, key, mode)
+    name = name .. "/" .. theory.note_name(bass, bass_flats)
+  end
+  return name, analysis.numeral, analysis.func
 end
 
 ---Are all pads empty?

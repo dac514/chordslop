@@ -7,6 +7,7 @@
 
 local pads_mod = require "src.pads"
 local record = require "src.record"
+local voicing = require "src.voicing"
 
 local M = {}
 
@@ -81,7 +82,8 @@ function M.press(index, pad, velocity, from_midi)
   end
   local instrument = song.selected_instrument_index
   local track_index = song.selected_track_index
-  local notes = pads_mod.notes(pad)
+  local prefs = renoise.tool().preferences --[[@as ChordSlopPreferences]]
+  local notes = pads_mod.notes(pad, voicing.style(prefs.voicing.value))
   local vel = effective_velocity(song.transport, velocity, from_midi)
   song:trigger_instrument_note_on(instrument, track_index, notes, vel / 127)
   ---@type HeldPad

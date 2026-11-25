@@ -15,8 +15,10 @@
     t  chord type id from theory.CHORD_TYPES (default: the diatonic triad,
        or major when the root is altered)
     s  true for the diatonic seventh instead of the triad
-    i  inversion 0-3 (default 0)
+    i  inversion 0-3 (default 0): which chord tone is lowest
     o  octave offset from the base octave (default 0)
+    b  scale degree 1-7 of a slash bass (default: none, the inversion decides)
+    ba accidental on the slash bass: -1 flat, +1 sharp (default 0)
   `false` leaves the pad empty.
 ]]
 
@@ -32,6 +34,8 @@ local M = {}
 ---@field s boolean? Diatonic seventh.
 ---@field i integer? Inversion.
 ---@field o integer? Octave offset.
+---@field b integer? Scale degree of a slash bass.
+---@field ba integer? Accidental on the slash bass.
 
 ---@class Preset
 ---@field name string
@@ -534,6 +538,10 @@ function M.render_pad(spec, key, mode, base_octave)
     local _, diatonic = theory.diatonic_chord(key, mode, spec.d, spec.s)
     type_index = diatonic
   end
+  local bass = pads_mod.NO_BASS
+  if spec.b then
+    bass = (scale[spec.b] + (spec.ba or 0)) % 12
+  end
   return pads_mod.normalize {
     root = root,
     type = type_index,
@@ -542,6 +550,7 @@ function M.render_pad(spec, key, mode, base_octave)
       pads_mod.MIN_OCTAVE,
       math.min(pads_mod.MAX_OCTAVE, base_octave + (spec.o or 0))
     ),
+    bass = bass,
   }
 end
 
@@ -588,18 +597,44 @@ function M.remode(preset, pads, key, from_mode, to_mode, base_octave)
     else
       local delta = ((after[i].root - before[i].root + 6) % 12) - 6
       local absolute = pad.octave * 12 + pad.root + delta
+      local root = absolute % 12
+      local bass = pads_mod.NO_BASS
+      if after[i].bass >= 0 then
+        -- the bass keeps its distance to the root of the new chord
+        bass = (after[i].bass + root - after[i].root) % 12
+      end
       out[i] = pads_mod.normalize {
-        root = absolute % 12,
+        root = root,
         type = after[i].type,
         inversion = after[i].inversion,
         octave = math.max(
           pads_mod.MIN_OCTAVE,
           math.min(pads_mod.MAX_OCTAVE, math.floor(absolute / 12))
         ),
+        bass = bass,
       }
     end
   end
   return out
+end
+
+---Spell a pitch class as a scale degree and an accidental. Notes outside
+---the scale are the flattened upper degree (bVII, bIII, ...).
+---@param pc integer
+---@param key integer
+---@param mode integer
+---@return integer degree, integer accidental
+local function spell(pc, key, mode)
+  local degree = theory.degree_of(pc, key, mode)
+  if degree then
+    return degree, 0
+  end
+  for i, spc in ipairs(theory.scale(key, mode)) do
+    if (spc - 1) % 12 == pc % 12 then
+      return i, -1
+    end
+  end
+  error "pitch class not representable"
 end
 
 ---Write one pad as a spec relative to a key/mode. Roots outside the scale
@@ -614,18 +649,7 @@ function M.capture_pad(pad, key, mode)
   if pads_mod.is_empty(pad) then
     return false
   end
-  local scale = theory.scale(key, mode)
-  local degree = theory.degree_of(pad.root, key, mode)
-  local acc = 0
-  if not degree then
-    for i, pc in ipairs(scale) do
-      if (pc - 1) % 12 == pad.root then
-        degree, acc = i, -1
-        break
-      end
-    end
-  end
-  assert(degree, "pad root not representable")
+  local degree, acc = spell(pad.root, key, mode)
   local spec = { d = degree, t = theory.CHORD_TYPES[pad.type].id }
   if acc ~= 0 then
     spec.a = acc
@@ -644,6 +668,13 @@ function M.capture_pad(pad, key, mode)
   end
   if pad.octave ~= pads_mod.DEFAULT_OCTAVE then
     spec.o = pad.octave - pads_mod.DEFAULT_OCTAVE
+  end
+  if pad.bass and pad.bass >= 0 then
+    local b, ba = spell(pad.bass, key, mode)
+    spec.b = b
+    if ba ~= 0 then
+      spec.ba = ba
+    end
   end
   return spec
 end

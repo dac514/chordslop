@@ -34,6 +34,8 @@ local App = {}
 ---@field pad_types renoise.Document.ObservableNumberList
 ---@field pad_inversions renoise.Document.ObservableNumberList
 ---@field pad_octaves renoise.Document.ObservableNumberList
+---@field pad_basses renoise.Document.ObservableNumberList
+---@field voicing renoise.Document.ObservableNumber
 ---@field presets renoise.Document.DocumentList
 
 App.name = "ChordSlop"

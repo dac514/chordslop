@@ -4,7 +4,7 @@
   list layout.
 
   User presets are stored relative to a key, as degree/accidental/type/
-  seventh/inversion/octave-offset lists plus the mode (see `src/presets.lua`),
+  seventh/inversion/octave-offset/bass lists plus the mode (see `src/presets.lua`),
   so they render into whatever key and mode is current, like the factory ones.
 ]]
 
@@ -24,6 +24,8 @@ M.PRESET_MODEL = "ChordSlopPreset"
 ---@field sevenths renoise.Document.ObservableNumberList 1 = diatonic seventh (when type is 0).
 ---@field inversions renoise.Document.ObservableNumberList
 ---@field octaves renoise.Document.ObservableNumberList Octave offsets.
+---@field basses renoise.Document.ObservableNumberList Slash bass degree; 0 = none.
+---@field bass_accidentals renoise.Document.ObservableNumberList
 
 ---@param list renoise.Document.ObservableNumberList
 ---@return number[]
@@ -57,18 +59,20 @@ function M.load_pads(prefs)
     read(prefs.pad_roots),
     read(prefs.pad_types),
     read(prefs.pad_inversions),
-    read(prefs.pad_octaves)
+    read(prefs.pad_octaves),
+    read(prefs.pad_basses)
   )
 end
 
 ---@param prefs ChordSlopPreferences
 ---@param pads Pad[]
 function M.save_pads(prefs, pads)
-  local roots, types, inversions, octaves = pads_mod.to_lists(pads)
+  local roots, types, inversions, octaves, basses = pads_mod.to_lists(pads)
   write(prefs.pad_roots, roots)
   write(prefs.pad_types, types)
   write(prefs.pad_inversions, inversions)
   write(prefs.pad_octaves, octaves)
+  write(prefs.pad_basses, basses)
 end
 
 ---@param prefs ChordSlopPreferences
@@ -108,6 +112,7 @@ function M.save_user_preset(prefs, preset)
   entry.name.value = preset.name
   entry.mode.value = preset.mode or 0
   local degrees, accidentals, types, sevenths, inversions, octaves = {}, {}, {}, {}, {}, {}
+  local basses, bass_accidentals = {}, {}
   for i = 1, pads_mod.COUNT do
     local spec = preset.pads[i]
     if spec then
@@ -117,9 +122,12 @@ function M.save_user_preset(prefs, preset)
       sevenths[i] = spec.s and 1 or 0
       inversions[i] = spec.i or 0
       octaves[i] = spec.o or 0
+      basses[i] = spec.b or 0
+      bass_accidentals[i] = spec.ba or 0
     else
       degrees[i], accidentals[i], types[i], sevenths[i], inversions[i], octaves[i] =
         0, 0, 0, 0, 0, 0
+      basses[i], bass_accidentals[i] = 0, 0
     end
   end
   write(entry.degrees, degrees)
@@ -128,6 +136,8 @@ function M.save_user_preset(prefs, preset)
   write(entry.sevenths, sevenths)
   write(entry.inversions, inversions)
   write(entry.octaves, octaves)
+  write(entry.basses, basses)
+  write(entry.bass_accidentals, bass_accidentals)
   return index
 end
 
@@ -142,6 +152,8 @@ function M.load_user_preset(prefs, index)
   local sevenths = read(entry.sevenths)
   local inversions = read(entry.inversions)
   local octaves = read(entry.octaves)
+  local basses = read(entry.basses)
+  local bass_accidentals = read(entry.bass_accidentals)
   local specs = {}
   for i = 1, pads_mod.COUNT do
     local d = degrees[i] or 0
@@ -161,6 +173,13 @@ function M.load_user_preset(prefs, index)
       end
       if (octaves[i] or 0) ~= 0 then
         spec.o = octaves[i]
+      end
+      local b = basses[i] or 0
+      if b >= 1 and b <= 7 then
+        spec.b = b
+        if (bass_accidentals[i] or 0) ~= 0 then
+          spec.ba = bass_accidentals[i]
+        end
       end
       specs[i] = spec
     else

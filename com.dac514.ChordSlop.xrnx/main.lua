@@ -40,6 +40,8 @@ if not renoise.tool().preferences then
     sevenths = { 0 }, -- 1 = that diatonic chord as a seventh
     inversions = { 0 },
     octaves = { 0 },
+    basses = { 0 }, -- slash bass as a scale degree; 0 = none
+    bass_accidentals = { 0 },
   }
 
   local function sixteen(value)
@@ -63,6 +65,8 @@ if not renoise.tool().preferences then
     pad_types = sixteen(0), -- 0 = empty pad; first run loads the first factory preset
     pad_inversions = sixteen(0),
     pad_octaves = sixteen(4),
+    pad_basses = sixteen(-1), -- slash bass pitch class; -1 = none
+    voicing = 2, -- 1 Close, 2 Open, 3 Wide (src/voicing.lua)
     preset_name = "", -- the preset the pads came from ("" = none)
     preset_dirty = false, -- the pads have been edited since that preset was loaded
     presets = renoise.Document.DocumentList(),

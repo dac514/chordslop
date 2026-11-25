@@ -1,6 +1,7 @@
 local t = require "tests.helper"
 local pads = require "src.pads"
 local theory = require "src.theory"
+local voicing = require "src.voicing"
 
 local function list(xs)
   return table.concat(xs, ",")
@@ -33,8 +34,41 @@ t.eq(bad[1].root, 0, "invalid root -> 0")
 t.eq(bad[1].type, 0, "invalid type -> empty")
 t.eq(bad[1].inversion, 0, "invalid inversion -> 0")
 t.eq(bad[1].octave, 4, "invalid octave -> default")
+t.eq(bad[1].bass, -1, "no bass list -> no slash bass")
 
-t.eq(list(pads.notes(p)), "59,63,66", "notes of B major")
+-- slash bass: kept in the lists, moved by transpose
+local slash = { root = 5, type = maj, inversion = 0, octave = 4, bass = 7 } -- F/G
+local r2, t2, i2, o2, b2 = pads.to_lists { slash }
+t.eq(b2[1], 7, "to_lists keeps the bass")
+t.eq(b2[2], -1, "empty pads have no bass")
+t.eq(pads.from_lists(r2, t2, i2, o2, b2)[1].bass, 7, "round trip bass")
+t.eq(pads.from_lists(r2, t2, i2, o2, { 12 })[1].bass, -1, "invalid bass -> none")
+local slash_up = pads.transpose({ slash }, 2)[1]
+t.eq(slash_up.root, 7, "slash chord root moves")
+t.eq(slash_up.bass, 9, "slash bass moves with the root")
+t.eq(pads.transpose({ p }, 2)[1].bass, -1, "no bass stays none")
+t.eq(pads.label(slash, 0, 1), "F/G", "slash label")
+t.eq(
+  pads.label({ root = 0, type = maj, inversion = 1, octave = 4 }, 0, 1),
+  "C/E",
+  "inversion label"
+)
+t.eq(
+  pads.label({ root = 0, type = maj, inversion = 0, octave = 4, bass = 0 }, 0, 1),
+  "C",
+  "root bass"
+)
+t.eq(
+  pads.label({ root = 5, type = maj, inversion = 0, octave = 4, bass = 1 }, 0, 1),
+  "F/Db",
+  "out bass is flat"
+)
+local _, _, slash_func =
+  pads.label({ root = 5, type = maj, inversion = 0, octave = 4, bass = 6 }, 0, 1)
+t.eq(slash_func, "borrowed", "a bass outside the key takes the pad out of it")
+
+t.eq(list(pads.notes(p, voicing.CLOSE)), "59,63,66", "notes of B major, close")
+t.eq(list(pads.notes(p)), list(voicing.notes(p, voicing.DEFAULT)), "default style")
 t.eq(#pads.notes(e), 0, "empty pad has no notes")
 
 local name, numeral, func =

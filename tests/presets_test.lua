@@ -164,7 +164,7 @@ local c_major = presets.render(jazz, 0, 1)
 local c_minor = presets.remode(jazz, c_major, 0, 1, theory.MODE_AEOLIAN)
 t.eq(
   names(c_minor, 0, theory.MODE_AEOLIAN),
-  "Dm7b5 Gm7 Cm7 C6 Ebmaj7 Abmaj7 Dm7b5 Gm7 Fm7 Bb7 Ebmaj7 Abmaj7 Dm7b5 Gm7 Cm7 Fm7",
+  "Dm7b5 Gm7 Cm7 C6 Ebmaj7 Abmaj7 Dm7b5/Ab Gm7/D Fm7 Bb7 Ebmaj7/Bb Abmaj7/Eb Dm7b5/F Gm7/Bb Cm7/G Fm7/Ab",
   "jazz preset re-rendered in C Aeolian"
 )
 local green = 0

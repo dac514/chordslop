@@ -9,6 +9,7 @@
 ]]
 
 local theory = require "src.theory"
+local voicing = require "src.voicing"
 
 local M = {}
 
@@ -295,7 +296,8 @@ end
 
 ---Level of a pad: the level of the ring button it lights, except that a
 ---chord on a home slot with a note outside the key (Bm on the B° slot of
----C major, Gmaj7 on the V slot of C minor) is only near.
+---C major, Gmaj7 on the V slot of C minor, a slash bass outside the key)
+---is only near.
 ---@param pad Pad
 ---@param key integer
 ---@param mode integer
@@ -303,7 +305,8 @@ end
 function M.pad_level(pad, key, mode)
   local ring, k = M.ring_for_pad(pad, key, mode)
   local level = M.level_at(k, ring, key, mode)
-  if level == "home" and theory.analyze(pad.root, pad.type, key, mode).func ~= "in_key" then
+  local bass = voicing.has_bass(pad) and pad.bass or nil
+  if level == "home" and theory.analyze(pad.root, pad.type, key, mode, bass).func ~= "in_key" then
     return "near"
   end
   return level

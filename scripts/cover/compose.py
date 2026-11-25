@@ -162,10 +162,8 @@ def cover(src, circle, pads, colors):
     draw = ImageDraw.Draw(img)
     x0 = 34 * SS
     two_tone(draw, (x0, 40 * SS), 50, "Chord", "Slop")
-    tag = font("regular", 18)
-    draw.text((x0, 116 * SS), "Chord pads for trackers.", font=tag, fill=WHITE)
-    draw.text((x0, 144 * SS), "Sixteen chords that fit the key.", font=tag, fill=GREY)
-    draw.text((x0, 168 * SS), "Play from pads, MIDI or QWERTY.", font=tag, fill=GREY)
+    draw.text((x0, 118 * SS), "Play like you practiced.", font=font("regular", 22), fill=WHITE)
+    draw.text((x0, 154 * SS), "Chord pads for trackers.", font=font("regular", 18), fill=GREY)
 
     # the first pad row from the capture, at half size
     gx, gy, gw, gh = pads

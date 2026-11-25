@@ -21,7 +21,7 @@ M.PRESET_MODEL = "ChordSlopPreset"
 ---@field degrees renoise.Document.ObservableNumberList 0 = empty pad
 ---@field accidentals renoise.Document.ObservableNumberList
 ---@field types renoise.Document.ObservableNumberList Chord type index; 0 = diatonic.
----@field sevenths renoise.Document.ObservableNumberList 1 = diatonic seventh (when type is 0).
+---@field sevenths renoise.Document.ObservableNumberList 1 = diatonic seventh, 9/11/13 = diatonic extension (when type is 0).
 ---@field inversions renoise.Document.ObservableNumberList
 ---@field octaves renoise.Document.ObservableNumberList Octave offsets.
 ---@field basses renoise.Document.ObservableNumberList Slash bass degree; 0 = none.
@@ -119,7 +119,7 @@ function M.save_user_preset(prefs, preset)
       degrees[i] = spec.d
       accidentals[i] = spec.a or 0
       types[i] = spec.t and (theory.type_index(spec.t) or 1) or 0
-      sevenths[i] = spec.s and 1 or 0
+      sevenths[i] = spec.x or (spec.s and 1 or 0)
       inversions[i] = spec.i or 0
       octaves[i] = spec.o or 0
       basses[i] = spec.b or 0
@@ -164,6 +164,8 @@ function M.load_user_preset(prefs, index)
         spec.t = chord.id
       elseif (sevenths[i] or 0) == 1 then
         spec.s = true
+      elseif sevenths[i] == 9 or sevenths[i] == 11 or sevenths[i] == 13 then
+        spec.x = sevenths[i]
       end
       if (accidentals[i] or 0) ~= 0 then
         spec.a = accidentals[i]

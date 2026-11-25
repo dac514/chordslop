@@ -37,7 +37,7 @@ if not renoise.tool().preferences then
     degrees = { 0 },
     accidentals = { 0 },
     types = { 0 }, -- 0 = the diatonic chord of the degree
-    sevenths = { 0 }, -- 1 = that diatonic chord as a seventh
+    sevenths = { 0 }, -- 1 = that diatonic chord as a seventh; 9, 11, 13 = as that extension
     inversions = { 0 },
     octaves = { 0 },
     basses = { 0 }, -- slash bass as a scale degree; 0 = none

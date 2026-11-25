@@ -3,6 +3,7 @@ local presets = require "src.presets"
 local pads_mod = require "src.pads"
 local theory = require "src.theory"
 local circle = require "src.circle"
+local voicing = require "src.voicing"
 
 local function names(pads, key, mode)
   local out = {}
@@ -48,27 +49,31 @@ for _, preset in ipairs(presets.FACTORY) do
   end
 end
 
--- no two pads of a factory preset play the same notes, in any key
+-- no two pads of a factory preset play the same notes, in any key and voicing
 for _, preset in ipairs(presets.FACTORY) do
   local modes = preset.mode and { preset.mode } or { 1, 2, 3, 4, 5, 6, 7 }
   for _, mode in ipairs(modes) do
     for key = 0, 11 do
-      ---@type table<string, integer> notes -> first pad that plays them
-      local seen = {}
-      for i, pad in ipairs(presets.render(preset, key, mode)) do
-        if not pads_mod.is_empty(pad) then
-          local notes = table.concat(pads_mod.notes(pad), ",")
-          t.check(
-            not seen[notes],
-            ("%s pad %d plays the notes of pad %s in key %d mode %d"):format(
-              preset.name,
-              i,
-              tostring(seen[notes]),
-              key,
-              mode
+      local rendered = presets.render(preset, key, mode)
+      for style = 1, #voicing.STYLES do
+        ---@type table<string, integer> notes -> first pad that plays them
+        local seen = {}
+        for i, pad in ipairs(rendered) do
+          if not pads_mod.is_empty(pad) then
+            local notes = table.concat(pads_mod.notes(pad, style), ",")
+            t.check(
+              not seen[notes],
+              ("%s pad %d plays the notes of pad %s in key %d mode %d, %s"):format(
+                preset.name,
+                i,
+                tostring(seen[notes]),
+                key,
+                mode,
+                voicing.STYLES[style]
+              )
             )
-          )
-          seen[notes] = seen[notes] or i
+            seen[notes] = seen[notes] or i
+          end
         end
       end
     end
@@ -145,9 +150,12 @@ t.eq(low and low.o, -1, "octave offset captured")
 t.eq(low and low.i, 2, "inversion captured")
 
 -- capture writes diatonic chords as degrees, so they adapt to another mode
-t.eq(captured.pads[1] and captured.pads[1].s, true, "diatonic seventh captured as s")
-t.eq(captured.pads[1] and captured.pads[1].t, nil, "no fixed type for a diatonic seventh")
-t.eq(captured.pads[4] and captured.pads[4].t, "6", "a sixth chord keeps its type")
+t.eq(captured.pads[13] and captured.pads[13].s, true, "diatonic seventh captured as s")
+t.eq(captured.pads[13] and captured.pads[13].t, nil, "no fixed type for a diatonic seventh")
+t.eq(captured.pads[1] and captured.pads[1].x, 9, "diatonic ninth captured as x")
+t.eq(captured.pads[1] and captured.pads[1].t, nil, "no fixed type for a diatonic ninth")
+t.eq(captured.pads[2] and captured.pads[2].x, 13, "diatonic thirteenth captured as x")
+t.eq(captured.pads[4] and captured.pads[4].t, "6add9", "a sixth chord keeps its type")
 t.eq(
   names({ presets.render(captured, 2, theory.MODE_AEOLIAN)[1] }, 2, 6),
   "Em7b5",
@@ -164,8 +172,8 @@ local c_major = presets.render(jazz, 0, 1)
 local c_minor = presets.remode(jazz, c_major, 0, 1, theory.MODE_AEOLIAN)
 t.eq(
   names(c_minor, 0, theory.MODE_AEOLIAN),
-  "Dm7b5 Gm7 Cm7 C6 Ebmaj7 Abmaj7 Dm7b5/Ab Gm7/D Fm7 Bb7 Ebmaj7/Bb Abmaj7/Eb Dm7b5/F Gm7/Bb Cm7/G Fm7/Ab",
-  "jazz preset re-rendered in C Aeolian"
+  "Dm7b5 Gm7 Cm9 C6add9 Ebmaj7 Abmaj9 Dm7b5 Gm7 Fm7 Bb7 Eb7sus4 Abmaj7 Dm7b5 G9sus4 Cm7 Fm9",
+  "jazz preset re-rendered in C Aeolian: ninths follow the mode, or fall back to sevenths"
 )
 local green = 0
 for _, pad in ipairs(c_minor) do
@@ -174,8 +182,11 @@ for _, pad in ipairs(c_minor) do
     green = green + 1
   end
 end
-t.eq(green, 15, "fifteen of sixteen jazz pads are in key in Aeolian (C6 is not)")
-t.eq(c_minor[13].inversion, 1, "inversions survive remode")
+t.eq(green, 13, "thirteen jazz pads are in key in Aeolian (not C6add9, Eb7sus4, G9sus4)")
+local pop = find "Pop"
+local pop_minor = presets.remode(pop, presets.render(pop, 0, 1), 0, 1, theory.MODE_AEOLIAN)
+t.eq(pop_minor[5].inversion, 1, "inversions survive remode")
+t.eq(names({ pop_minor[8] }, 0, theory.MODE_AEOLIAN), "Fm/G", "IV/V becomes iv/v in minor")
 
 -- remode keeps the register the pads have after a key transposition
 local b_major = pads_mod.transpose(c_major, -1) -- C -> B, shortest route
@@ -183,7 +194,7 @@ t.eq(b_major[3].octave, 3, "transposing down carries the tonic chord to octave 3
 local b_minor = presets.remode(jazz, b_major, 11, 1, theory.MODE_AEOLIAN)
 t.eq(b_minor[3].root, 11, "tonic stays on B")
 t.eq(b_minor[3].octave, 3, "tonic keeps its octave")
-t.eq(names({ b_minor[3] }, 11, theory.MODE_AEOLIAN), "Bm7", "tonic becomes minor seventh")
+t.eq(names({ b_minor[3] }, 11, theory.MODE_AEOLIAN), "Bm9", "tonic major ninth becomes minor ninth")
 t.eq(b_minor[1].octave, 4, "ii keeps its octave")
 
 -- remode moves a root by the shortest route when the degree wraps across C
@@ -193,5 +204,32 @@ local cs_minor = presets.remode(presets.FACTORY[1], cs_major, 1, 1, theory.MODE_
 t.eq(cs_minor[7].root, 11, "degree 7 of C# minor is B")
 t.eq(cs_minor[7].octave, cs_major[7].octave - 1, "B sits a semitone below the C it replaces")
 t.eq(cs_minor[8].type, 0, "empty slots stay empty")
+
+-- slash bass: rendered from a degree, captured back, moved by remode
+local slash = presets.render_pad({ d = 4, b = 5 }, 2, 1, 4) -- G/A in D major
+t.eq(slash.root, 7, "slash chord root")
+t.eq(slash.bass, 9, "slash bass from its degree")
+t.eq(presets.render_pad({ d = 1 }, 2, 1, 4).bass, -1, "no b, no slash bass")
+local spec = presets.capture_pad(slash, 2, 1)
+t.eq(spec and spec.b, 5, "slash bass captured as a degree")
+t.eq(spec and spec.ba, nil, "an in-key bass has no accidental")
+local flat = presets.capture_pad({ root = 0, type = 1, inversion = 0, octave = 4, bass = 10 }, 0, 1)
+t.eq(flat and flat.b, 7, "a flat bass is the degree above")
+t.eq(flat and flat.ba, -1, "with a flat")
+local back_flat = presets.render_pad(flat --[[@as PresetPad]], 0, 1, 4)
+t.eq(back_flat.bass, 10, "flat bass round trip")
+
+-- diatonic extensions follow the mode
+local function ext(d, x, key, mode)
+  return names({ presets.render_pad({ d = d, x = x }, key, mode, 4) }, key, mode)
+end
+t.eq(ext(2, 9, 0, 1), "Dm9", "ii9 in C major")
+t.eq(ext(1, 9, 0, 1), "Cmaj9", "Imaj9 in C major")
+t.eq(ext(5, 9, 0, 1), "G9", "V9 in C major")
+t.eq(ext(5, 13, 0, 1), "G13", "V13 in C major")
+t.eq(ext(6, 11, 0, 1), "Am11", "vi11 in C major")
+t.eq(ext(1, 9, 9, 6), "Am9", "i9 in A minor")
+t.eq(ext(3, 9, 0, 1), "Em7", "iii9 does not exist in major: the seventh plays")
+t.eq(ext(1, 11, 0, 1), "Cmaj7", "no type for Cmaj7(11): the seventh plays")
 
 t.done()

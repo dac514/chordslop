@@ -220,17 +220,41 @@ end
 ---@param seventh boolean? Add the diatonic seventh.
 ---@return integer root, integer type_index
 function M.diatonic_chord(key, mode, degree, seventh)
+  local root, index = M.diatonic_extended(key, mode, degree, seventh and 7 or 5)
+  assert(index, "no chord type for diatonic intervals")
+  return root, index
+end
+
+---Scale steps above the root for each extension: the third, fifth, seventh,
+---ninth, eleventh and thirteenth are 2, 4, 6, 8, 10 and 12 steps up. A
+---thirteenth chord leaves out the eleventh, as players do.
+local EXTENSION_STEPS = {
+  [5] = { 2, 4 },
+  [7] = { 2, 4, 6 },
+  [9] = { 2, 4, 6, 8 },
+  [11] = { 2, 4, 6, 8, 10 },
+  [13] = { 2, 4, 6, 8, 12 },
+}
+
+---The chord built by stacking thirds on a scale degree up to an extension.
+---@param key integer 0-11
+---@param mode integer 1-7
+---@param degree integer 1-7
+---@param extension integer 5 (triad), 7, 9, 11 or 13
+---@return integer root, integer? type_index nil when no chord type has those intervals (Em7b9)
+function M.diatonic_extended(key, mode, degree, extension)
   local scale = M.scale(key, mode)
   local root = scale[degree]
   local intervals = { 0 }
-  local count = seventh and 4 or 3
-  for n = 1, count - 1 do
-    local pc = scale[((degree - 1 + 2 * n) % 7) + 1]
-    intervals[#intervals + 1] = (pc - root) % 12
+  for _, step in ipairs(assert(EXTENSION_STEPS[extension], "unknown extension")) do
+    local pc = scale[((degree - 1 + step) % 7) + 1]
+    local interval = (pc - root) % 12
+    if step >= 8 then
+      interval = interval + 12
+    end
+    intervals[#intervals + 1] = interval
   end
-  local index = type_for_intervals(intervals)
-  assert(index, "no chord type for diatonic intervals")
-  return root, index
+  return root, type_for_intervals(intervals)
 end
 
 ---@param set integer[]

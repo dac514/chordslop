@@ -134,12 +134,34 @@ function M.note_name(pc, flats)
   return names[(pc % 12) + 1]
 end
 
+---Move ascending notes by whole octaves until they all lie in 0..119, so a
+---chord at the ends of the range keeps its shape instead of having notes
+---squashed onto the same key.
+---@param notes integer[] ascending; changed in place
+---@return integer[] notes
+function M.fit_range(notes)
+  if #notes == 0 then
+    return notes
+  end
+  local shift = 0
+  while notes[#notes] + shift > M.MAX_NOTE do
+    shift = shift - 12
+  end
+  while notes[1] + shift < M.MIN_NOTE do
+    shift = shift + 12
+  end
+  for i, note in ipairs(notes) do
+    notes[i] = note + shift
+  end
+  return notes
+end
+
 ---Build the note values of a chord.
 ---@param root integer 0-11
 ---@param type_index integer 1..#CHORD_TYPES
----@param inversion integer 0-3; the lowest `inversion` tones move up an octave (clamped to the chord size)
+---@param inversion integer 0-3; the lowest `inversion` tones move up until the next tone is lowest (clamped to the chord size)
 ---@param octave integer 0-9 Renoise octave of the root (4 -> 48 + root)
----@return integer[] notes Ascending, each clamped to 0..119.
+---@return integer[] notes Ascending, in 0..119 (see `fit_range`).
 function M.build_notes(root, type_index, inversion, octave)
   local chord = M.CHORD_TYPES[type_index]
   local base = octave * 12 + root
@@ -148,15 +170,16 @@ function M.build_notes(root, type_index, inversion, octave)
     notes[i] = base + interval
   end
   inversion = clamp(inversion or 0, 0, #notes - 1)
-  for _ = 1, inversion do
-    local lowest = table.remove(notes, 1)
-    notes[#notes + 1] = lowest + 12
-  end
-  for i, note in ipairs(notes) do
-    notes[i] = clamp(note, M.MIN_NOTE, M.MAX_NOTE)
+  -- the tone the inversion puts lowest; every tone below it moves up by
+  -- octaves until it is above it (twice for the root under a ninth)
+  local bass = notes[inversion + 1]
+  for i = 1, inversion do
+    while notes[i] <= bass do
+      notes[i] = notes[i] + 12
+    end
   end
   table.sort(notes)
-  return notes
+  return M.fit_range(notes)
 end
 
 ---The seven pitch classes of a scale.

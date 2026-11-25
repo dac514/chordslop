@@ -220,9 +220,8 @@ function M.label(pad, key, mode)
   local name = theory.chord_name(pad.root, pad.type, flats)
   local bass = voicing.bass_pc(pad)
   if bass ~= pad.root then
-    -- a bass outside the key reads as a flat, like the flattened degrees
-    local bass_flats = flats or not theory.degree_of(bass, key, mode)
-    name = name .. "/" .. theory.note_name(bass, bass_flats)
+    -- the bass is spelled like the root, so a name never mixes C# and Ab
+    name = name .. "/" .. theory.note_name(bass, flats)
   end
   return name, analysis.numeral, analysis.func
 end

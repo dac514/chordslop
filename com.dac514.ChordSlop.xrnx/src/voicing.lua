@@ -2,8 +2,8 @@
   Voicing: which notes a pad plays. Pure Lua (`tests/voicing_test.lua`).
 
   Close  the chord stacked from its root, as ChordSlop always played it. The
-         inversion moves the lowest tones up an octave. A slash bass adds one
-         note an octave below the root.
+         inversion moves the lowest tones up an octave. A slash bass adds the
+         nearest note of the bass below the chord.
   Open   a single bass note an octave below the pad octave (C-3..B-3 at octave
          4), and above it the chord in close position in a fixed register.
          Chords of four or more tones leave out the tone the bass already
@@ -46,12 +46,6 @@ M.CLASH_PENALTY = 3
 
 ---Wide: fewest semitones between the octave above the bass and the upper notes.
 M.WIDE_GAP = 3
-
----@param value integer
----@return integer
-local function clamp_note(value)
-  return math.max(theory.MIN_NOTE, math.min(theory.MAX_NOTE, value))
-end
 
 ---@param list integer[]
 ---@param value integer
@@ -190,9 +184,10 @@ end
 local function close(pad)
   local notes = theory.build_notes(pad.root, pad.type, pad.inversion or 0, pad.octave)
   if M.has_bass(pad) then
-    table.insert(notes, 1, clamp_note((pad.octave - 1) * 12 + pad.bass % 12))
+    -- the nearest note of the bass below the chord
+    table.insert(notes, 1, notes[1] - 1 - ((notes[1] - 1 - pad.bass) % 12))
   end
-  return notes
+  return theory.fit_range(notes)
 end
 
 ---@param pad Pad
@@ -229,18 +224,8 @@ local function open(pad, wide)
   for _, n in ipairs(notes) do
     out[#out + 1] = n
   end
-  for i, n in ipairs(out) do
-    out[i] = clamp_note(n)
-  end
   table.sort(out)
-  -- clamping at the ends of the range can stack notes: drop repeats
-  local unique = {}
-  for _, n in ipairs(out) do
-    if n ~= unique[#unique] then
-      unique[#unique + 1] = n
-    end
-  end
-  return unique
+  return theory.fit_range(out)
 end
 
 ---Notes a pad plays in a voicing style, ascending.

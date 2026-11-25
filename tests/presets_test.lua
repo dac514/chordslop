@@ -232,4 +232,81 @@ t.eq(ext(1, 9, 9, 6), "Am9", "i9 in A minor")
 t.eq(ext(3, 9, 0, 1), "Em7", "iii9 does not exist in major: the seventh plays")
 t.eq(ext(1, 11, 0, 1), "Cmaj7", "no type for Cmaj7(11): the seventh plays")
 
+-- every preset in every key: capture and render give the same pads back,
+-- and a change to any mode keeps every pad valid and its root in range
+local problems = {}
+local function problem(what)
+  if #problems < 10 then
+    problems[#problems + 1] = what
+  end
+end
+for _, preset in ipairs(presets.FACTORY) do
+  local from_modes = preset.mode and { preset.mode } or { 1, 2, 3, 4, 5, 6, 7 }
+  for _, from in ipairs(from_modes) do
+    for key = 0, 11 do
+      local rendered = presets.render(preset, key, from)
+      local again = presets.render(presets.capture(rendered, key, from, "x"), key, from)
+      for i = 1, pads_mod.COUNT do
+        local a, b = rendered[i], again[i]
+        if
+          a.root ~= b.root
+          or a.type ~= b.type
+          or a.inversion ~= b.inversion
+          or a.octave ~= b.octave
+          or a.bass ~= b.bass
+        then
+          problem(
+            ("%s key %d mode %d pad %d does not round trip"):format(preset.name, key, from, i)
+          )
+        end
+      end
+      for to = 1, 7 do
+        local ok, moved = pcall(presets.remode, preset, rendered, key, from, to)
+        if not ok then
+          problem(("%s key %d mode %d -> %d: %s"):format(preset.name, key, from, to, moved))
+        else
+          for i, pad in ipairs(moved) do
+            local normal = pads_mod.normalize(pad)
+            if
+              normal.type ~= pad.type
+              or normal.bass ~= pad.bass
+              or normal.octave ~= pad.octave
+              or #pads_mod.notes(pad) ~= #pads_mod.notes(normal)
+            then
+              problem(
+                ("%s key %d mode %d -> %d pad %d invalid"):format(preset.name, key, from, to, i)
+              )
+            end
+            local name = pads_mod.label(pad, key, to)
+            if not pads_mod.is_empty(pad) and name == "" then
+              problem(("%s pad %d has no name"):format(preset.name, i))
+            end
+          end
+        end
+      end
+    end
+  end
+end
+t.check(
+  #problems == 0,
+  "every preset round trips and survives every mode: " .. table.concat(problems, "; ")
+)
+
+-- the longest pad name a factory preset shows, so the pad font can be checked
+local longest = ""
+for _, preset in ipairs(presets.FACTORY) do
+  local modes = preset.mode and { preset.mode } or { 1, 2, 3, 4, 5, 6, 7 }
+  for _, mode in ipairs(modes) do
+    for key = 0, 11 do
+      for _, pad in ipairs(presets.render(preset, key, mode)) do
+        local name = pads_mod.label(pad, key, mode)
+        if #name > #longest then
+          longest = name
+        end
+      end
+    end
+  end
+end
+t.check(#longest <= 12, "longest factory pad name fits the pad: " .. longest)
+
 t.done()

@@ -37,8 +37,18 @@ t.eq(
 )
 t.eq(
   list(theory.build_notes(11, assert(theory.type_index "maj7"), 0, 9)),
-  "119,119,119,119",
-  "clamped at 119"
+  "107,111,114,118",
+  "a chord past B-9 moves down an octave instead of stacking on B-9"
+)
+t.eq(
+  list(theory.build_notes(0, assert(theory.type_index "add9"), 1, 4)),
+  "52,55,60,62",
+  "Cadd9 first inversion: as before"
+)
+t.eq(
+  list(theory.build_notes(0, assert(theory.type_index "add9"), 3, 4)),
+  "62,64,67,72",
+  "Cadd9 third inversion: the ninth is lowest, the root goes above it"
 )
 t.eq(
   list(theory.build_notes(0, assert(theory.type_index "5"), 0, 0)),

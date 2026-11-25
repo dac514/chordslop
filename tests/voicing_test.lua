@@ -104,7 +104,7 @@ end
 t.eq(list(voicing.notes(pad(7, "13"), voicing.OPEN)), "43,53,57,59,64", "open G13")
 t.eq(list(voicing.notes(pad(2, "m9"), voicing.OPEN)), "38,53,57,60,64", "open Dm9")
 
--- the octave moves everything; the ends of the range clamp
+-- the octave moves everything; at the ends of the range the chord moves by octaves
 local up = voicing.notes(pad(0, "min", 0, 5), voicing.OPEN)
 t.eq(list(up), "48,67,72,75", "octave 5 is an octave higher")
 for _, octave in ipairs { 0, 9 } do
@@ -119,5 +119,63 @@ end
 
 -- Wide: the fifth and the octave above the bass
 t.eq(list(voicing.notes(pad(0, "maj"), voicing.WIDE)), "36,43,48,55,60,64", "wide C")
+
+-- every pad that can exist: notes ascend, stay in range, never repeat, and
+-- the lowest note is the bass pitch class, even at octaves 0 and 9
+local bad = {}
+local function fail(what)
+  if #bad < 10 then
+    bad[#bad + 1] = what
+  end
+end
+local count = 0
+for style = 1, #voicing.STYLES do
+  for type_index = 1, #theory.CHORD_TYPES do
+    for root = 0, 11 do
+      for inversion = 0, 3 do
+        for bass = -1, 11 do
+          for octave = 0, 9 do
+            count = count + 1
+            local p = {
+              root = root,
+              type = type_index,
+              inversion = inversion,
+              octave = octave,
+              bass = bass,
+            }
+            local notes = voicing.notes(p, style)
+            local what = ("%s %s root %d inv %d bass %d oct %d: %s"):format(
+              voicing.STYLES[style],
+              theory.CHORD_TYPES[type_index].id,
+              root,
+              inversion,
+              bass,
+              octave,
+              list(notes)
+            )
+            if #notes < 2 then
+              fail(what .. " too few notes")
+            end
+            for k, n in ipairs(notes) do
+              if n < theory.MIN_NOTE or n > theory.MAX_NOTE then
+                fail(what .. " out of range")
+              end
+              if k > 1 and n <= notes[k - 1] then
+                fail(what .. " not ascending")
+              end
+            end
+            if #notes > 12 then
+              fail(what .. " more notes than note columns")
+            end
+            if notes[1] % 12 ~= voicing.bass_pc(p) then
+              fail(what .. " lowest note is not the bass")
+            end
+          end
+        end
+      end
+    end
+  end
+end
+t.check(#bad == 0, ("%d pads, all sound: %s"):format(count, table.concat(bad, "; ")))
 
 t.done()

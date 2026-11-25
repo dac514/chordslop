@@ -60,8 +60,18 @@ t.eq(
 )
 t.eq(
   pads.label({ root = 5, type = maj, inversion = 0, octave = 4, bass = 1 }, 0, 1),
-  "F/Db",
-  "out bass is flat"
+  "F/C#",
+  "C major spells with sharps"
+)
+t.eq(
+  pads.label({ root = 1, type = maj, inversion = 0, octave = 4, bass = 8 }, 2, 1),
+  "C#/G#",
+  "bass spelled like the root"
+)
+t.eq(
+  pads.label({ root = 10, type = maj, inversion = 0, octave = 4, bass = 1 }, 0, 1),
+  "Bb/Db",
+  "bVII and its bass read as flats"
 )
 local _, _, slash_func =
   pads.label({ root = 5, type = maj, inversion = 0, octave = 4, bass = 6 }, 0, 1)

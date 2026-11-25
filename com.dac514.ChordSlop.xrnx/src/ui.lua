@@ -31,7 +31,7 @@ local PAD_W, PAD_H, PAD_GAP = 122, 59, 6
 local GRID_COLS, GRID_ROWS = 4, 4
 local GRID_W = GRID_COLS * PAD_W + (GRID_COLS - 1) * PAD_GAP
 local LABEL_H = renoise.ViewBuilder.DEFAULT_CONTROL_HEIGHT
-local CIRCLE_SIZE = 450
+local CIRCLE_SIZE = 454
 local CIRCLE_W = CIRCLE_SIZE + 2 * renoise.ViewBuilder.DEFAULT_DIALOG_SPACING -- circle_panel incl. margin
 local EDITOR_W = GRID_W - 2 * GAP -- inside the editor group's margin
 local EDITOR_LABEL_W, EDITOR_CTRL_W = 30, 112 -- one cell of the editor grid
@@ -1244,8 +1244,9 @@ function M.build(app, palette)
     },
   }
 
-  ---One cell of the editor grid: a right-aligned label and its control. All
-  ---cells have the same width, so the controls of the two rows line up.
+  ---One cell of the editor grid: a left-aligned label and its control. All
+  ---cells have the same width, so the labels and the controls of the two
+  ---rows line up on both edges.
   ---@param label string
   ---@param control renoise.Views.View
   ---@param tooltip string?
@@ -1256,7 +1257,7 @@ function M.build(app, palette)
       vb:text {
         text = label,
         width = EDITOR_LABEL_W,
-        align = "right",
+        align = "left",
         style = "disabled",
         tooltip = tooltip,
       },
@@ -1403,7 +1404,7 @@ function M.build(app, palette)
     editor_head,
     editor_top,
     editor_bottom,
-    vb:space { height = 2 },
+    vb:space { height = 6 }, -- the keyboard stands apart from the controls
     vb:horizontal_aligner {
       mode = "center",
       width = EDITOR_W,
@@ -1542,6 +1543,7 @@ function M.build(app, palette)
       circle_panel,
       pads_panel,
     },
+    vb:space { height = 1 }, -- with the spacing around it: the footer stands apart from the panels
     footer,
   }
 

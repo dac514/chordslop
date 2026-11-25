@@ -1,8 +1,9 @@
 # ChordSlop
 
 Play a full chord with one press. ChordSlop gives you 16 chord pads and a
-circle of fifths that shows which chords fit your key. Start from one of 20
-presets, or fill the pads from the circle. Play with the mouse, a MIDI
+circle of fifths that shows which chords fit your key. Each chord plays with
+a bass note and an open voicing, like a keyboard player would play it. Start
+from one of 33 presets, or fill the pads from the circle. Play with the mouse, a MIDI
 controller or the computer keyboard. When edit mode is on, ChordSlop writes
 each chord into the pattern.
 
@@ -46,10 +47,38 @@ pad.
 
 Each pad has the colour of its chord on the circle. Under it, you see its
 roman numeral and its computer key. Click a pad to select it. The editor under
-the grid changes its root, chord type, inversion and octave.
+the grid changes its root, chord type, bass, inversion and octave.
+
+The keyboard under the editor shows the notes of the selected pad. While pads
+play, it shows their notes instead. The bass note is amber.
+
+**Chord types.** Besides triads, sixths and sevenths, the pads play ninths
+(maj9, m9, 9), the minor eleventh (m11), the thirteenth (13), suspended
+sevenths and ninths (7sus4, 9sus4), madd9, 6add9, 7b9, maj7#11 and add11.
+
+**Bass.** By default, the inversion chooses the bass note: 0 is the root, 1
+the third, 2 the fifth and 3 the seventh. The pad name shows the bass after a
+slash, as in C/E. Choose a note under *Bass* to play the chord over another
+bass note, as in F/G or Am/D. A bass note outside the key takes the pad out
+of the key.
 
 Power chords and suspended chords have no third. Such a pad lights the major
 or the minor chord on its root, whichever one is closer to the key.
+
+**Voicing.** The *Voicing* switch under the editor sets how all pads spread
+their notes.
+
+- *Open* is the default. A bass note sounds in the octave below, and the
+  chord sits above it in the same register on every pad. Chords of four or
+  more notes leave out the note that the bass already plays. So a change of
+  pad moves the top note only a little, and the chords stay clear.
+- *Wide* adds the fifth and the octave above the bass. Use it for pads and
+  strings.
+- *Close* stacks the chord from its root in one octave, with no bass. This is
+  how earlier versions of ChordSlop played every chord.
+
+The octave of a pad moves all its notes. At octave 4, the bass of *Open* and
+*Wide* is between C-3 and B-3.
 
 **Key and mode.** Choose a root note and one of seven modes. When *Transpose
 pads with key* is on, the pads move with the key. When it is off, the pads
@@ -60,17 +89,20 @@ key. *Fit pads to key* moves all pads together to where the most of them are
 in the key. It never changes a single pad, so it is active only when a better
 place exists.
 
-**Presets.** The presets cover pop, 1950s progressions, Pachelbel's Canon,
-jazz, bossa nova, gospel, neo-soul and lo-fi hip hop. Others cover minor keys,
-Dorian, Phrygian, Lydian, Mixolydian, power chords and suspended chords.
+**Presets.** The presets cover pop, songwriting, 1950s progressions,
+Pachelbel's Canon, jazz, bossa nova, gospel, neo-soul, R&B, disco and lo-fi
+hip hop. Others cover minor ballads, synthwave, trance, film music, Dorian,
+Phrygian, Lydian, Mixolydian, power chords and suspended chords. Some play
+every chord over one held bass note, for plucks and arpeggiators.
 
 - Many rows are a progression that you play from left to right.
-- No two pads play the same notes. A chord that returns uses another inversion
-  or octave.
+- No two pads play the same notes. A chord that returns uses another bass
+  note, inversion or extension.
 - Presets follow the key, and most of them set their own mode. In that mode,
   every pad is green.
 - If you change the mode later, ChordSlop builds the preset again in the new
-  mode. The jazz ii V I becomes a minor ii V i.
+  mode. The jazz ii V I becomes a minor ii V i. Ninths and elevenths follow
+  the mode too, and become sevenths where the mode has no such chord.
 
 After you edit a pad, the preset name gets an asterisk. Choose the preset
 again to restore it. *Save* stores your own layout under a name, and *Delete*

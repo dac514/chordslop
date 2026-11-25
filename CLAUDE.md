@@ -88,12 +88,14 @@ docs/renoise/                 vendored xrnx guide pages (start/, guide/)
 <Id>.xrnx/cover.png           optional renoise.com cover (600x350), with thumbnail.png (120x45)
 <Id>.xrnx/main.lua            thin entry: package.path, preferences schema (ChordSlopPreset model, then ChordSlopPreferences), APP.start(), dev bridge
 <Id>.xrnx/src/app.lua         App.start/stop, App.reg (menu/key/notifier/timer/midi), dialog key/focus/watch handlers, App.guard, App.defer
-<Id>.xrnx/src/ui.lua          ViewBuilder dialog: header, circle-of-fifths stack (canvas + ring buttons), 4x4 pads, editor, footer; returns (vb, root, ctl)
+<Id>.xrnx/src/ui.lua          ViewBuilder dialog: header, circle-of-fifths stack (canvas + ring buttons), 4x4 pads, editor with keyboard canvas, voicing switch, footer; returns (vb, root, ctl)
 <Id>.xrnx/src/player.lua      held notes, trigger_instrument_note_on/off, applies record plans to the pattern
 <Id>.xrnx/src/store.lua       preferences adapter: pads <-> number lists, user preset DocumentList CRUD
 <Id>.xrnx/src/anim.lua        circle rotation tween on an App.reg timer
 <Id>.xrnx/src/theory.lua      pure: chord types, modes, build_notes, roman numeral analysis (tests/theory_test.lua)
-<Id>.xrnx/src/pads.lua        pure: 16-pad model, transpose, fit to key, labels, list round trip
+<Id>.xrnx/src/pads.lua        pure: 16-pad model (with slash bass), transpose, fit to key, labels, list round trip
+<Id>.xrnx/src/voicing.lua     pure: the notes a pad plays in the Close, Open and Wide styles (bass + upper chord)
+<Id>.xrnx/src/keyboard.lua    pure: key geometry of the keyboard under the pad editor
 <Id>.xrnx/src/circle.lua      pure: circle-of-fifths geometry, rotation targets, easing, ring chords
 <Id>.xrnx/src/input.lua       pure: MIDI decode, MIDI/QWERTY note -> pad index
 <Id>.xrnx/src/record.lua      pure: where a chord is written (step/live), note-off placement

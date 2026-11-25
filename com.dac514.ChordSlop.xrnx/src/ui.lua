@@ -27,13 +27,14 @@ local SPACING = renoise.ViewBuilder.DEFAULT_CONTROL_SPACING
 local GAP = renoise.ViewBuilder.DEFAULT_DIALOG_SPACING
 local MARGIN = 12
 local PANEL_GAP = 16
-local PAD_W, PAD_H, PAD_GAP = 122, 64, 6
+local PAD_W, PAD_H, PAD_GAP = 122, 59, 6
 local GRID_COLS, GRID_ROWS = 4, 4
 local GRID_W = GRID_COLS * PAD_W + (GRID_COLS - 1) * PAD_GAP
 local LABEL_H = renoise.ViewBuilder.DEFAULT_CONTROL_HEIGHT
 local CIRCLE_SIZE = 450
 local CIRCLE_W = CIRCLE_SIZE + 2 * renoise.ViewBuilder.DEFAULT_DIALOG_SPACING -- circle_panel incl. margin
 local EDITOR_W = GRID_W - 2 * GAP -- inside the editor group's margin
+local EDITOR_LABEL_W, EDITOR_CTRL_W = 30, 112 -- one cell of the editor grid
 
 -- The keyboard under the pad editor: C-1 .. B-7, seven octaves.
 local KB_LOW, KB_HIGH = 12, 95
@@ -1243,18 +1244,50 @@ function M.build(app, palette)
     },
   }
 
+  ---One cell of the editor grid: a right-aligned label and its control. All
+  ---cells have the same width, so the controls of the two rows line up.
+  ---@param label string
+  ---@param control renoise.Views.View
+  ---@param tooltip string?
+  ---@return renoise.Views.Rack
+  local function cell(label, control, tooltip)
+    return vb:row {
+      spacing = SPACING,
+      vb:text {
+        text = label,
+        width = EDITOR_LABEL_W,
+        align = "right",
+        style = "disabled",
+        tooltip = tooltip,
+      },
+      control,
+    }
+  end
+
   -- Aligners, because a plain row shrinks to its content and would end short of the grid.
+  local editor_head = vb:horizontal_aligner {
+    id = "editor_head",
+    mode = "justify",
+    width = EDITOR_W,
+    vb:text { id = "editor_title", font = "bold", tooltip = "The selected pad" },
+    vb:text {
+      id = "editor_notes",
+      style = "disabled",
+      font = "mono",
+      align = "right",
+      tooltip = "The notes the selected pad plays, lowest first",
+    },
+  }
+
   local editor_top = vb:horizontal_aligner {
     id = "editor_top",
     mode = "justify",
     width = EDITOR_W,
-    vb:text { id = "editor_title", font = "bold", width = 44, tooltip = "The selected pad" },
-    vb:row {
-      spacing = SPACING,
-      vb:text { text = "Root", style = "disabled" },
+    cell(
+      "Root",
       vb:popup {
         id = "pad_root",
-        width = 80,
+        width = EDITOR_CTRL_W,
         items = KEY_ITEMS,
         tooltip = "Root note of the selected pad's chord",
         notifier = app.guard(function(value)
@@ -1265,14 +1298,13 @@ function M.build(app, palette)
             end
           end)
         end),
-      },
-    },
-    vb:row {
-      spacing = SPACING,
-      vb:text { text = "Type", style = "disabled" },
+      }
+    ),
+    cell(
+      "Type",
       vb:popup {
         id = "pad_type",
-        width = 84,
+        width = EDITOR_CTRL_W,
         items = type_items(),
         tooltip = "Chord type of the selected pad",
         notifier = app.guard(function(value)
@@ -1280,14 +1312,13 @@ function M.build(app, palette)
             pad.type = value - 1
           end)
         end),
-      },
-    },
-    vb:row {
-      spacing = SPACING,
-      vb:text { text = "Bass", style = "disabled", tooltip = TIP_BASS },
+      }
+    ),
+    cell(
+      "Bass",
       vb:popup {
         id = "pad_bass",
-        width = 84,
+        width = EDITOR_CTRL_W,
         items = bass_items(),
         tooltip = TIP_BASS,
         notifier = app.guard(function(value)
@@ -1296,25 +1327,19 @@ function M.build(app, palette)
           end)
         end),
       },
-    },
+      TIP_BASS
+    ),
   }
 
   local editor_bottom = vb:horizontal_aligner {
     id = "editor_bottom",
     mode = "justify",
     width = EDITOR_W,
-    vb:text {
-      id = "editor_notes",
-      style = "disabled",
-      font = "mono",
-      tooltip = "The notes the selected pad plays, lowest first",
-    },
-    vb:row {
-      spacing = SPACING,
-      vb:text { text = "Inv", style = "disabled" },
+    cell(
+      "Inv",
       vb:valuebox {
         id = "pad_inv",
-        width = 50,
+        width = EDITOR_CTRL_W,
         min = 0,
         max = pads_mod.MAX_INVERSION,
         tooltip = "Inversion: which chord tone is lowest (0 root, 1 third, 2 fifth, 3 seventh). A Bass note overrides it in Open and Wide.",
@@ -1323,12 +1348,13 @@ function M.build(app, palette)
             pad.inversion = value
           end)
         end),
-      },
-      vb:space { width = GAP },
-      vb:text { text = "Oct", style = "disabled" },
+      }
+    ),
+    cell(
+      "Oct",
       vb:valuebox {
         id = "pad_oct",
-        width = 50,
+        width = EDITOR_CTRL_W,
         min = pads_mod.MIN_OCTAVE,
         max = pads_mod.MAX_OCTAVE,
         tooltip = "Octave of the chord (4: the bass at C-3..B-3 in Open and Wide, the root at C-4 in Close)",
@@ -1337,10 +1363,13 @@ function M.build(app, palette)
             pad.octave = value
           end)
         end),
-      },
-      vb:space { width = GAP },
+      }
+    ),
+    cell(
+      "",
       vb:button {
         id = "pad_clear",
+        width = EDITOR_CTRL_W,
         text = "Clear",
         tooltip = "Empty the selected pad",
         notifier = app.guard(function()
@@ -1349,8 +1378,8 @@ function M.build(app, palette)
             pad.bass = pads_mod.NO_BASS
           end)
         end),
-      },
-    },
+      }
+    ),
   }
 
   -- Octave names under every C of the keyboard.
@@ -1371,6 +1400,7 @@ function M.build(app, palette)
     margin = GAP,
     spacing = SPACING,
     width = GRID_W,
+    editor_head,
     editor_top,
     editor_bottom,
     vb:space { height = 2 },

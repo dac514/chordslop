@@ -41,6 +41,9 @@ M.TARGET_TOP = 65
 ---Fewest semitones between the bass and the lowest upper note.
 M.MIN_GAP = 5
 
+---Extra distance for a voicing whose top two notes are a semitone apart.
+M.CLASH_PENALTY = 3
+
 ---Wide: fewest semitones between the octave above the bass and the upper notes.
 M.WIDE_GAP = 3
 
@@ -136,7 +139,8 @@ end
 ---Place a set of pitch classes in close position with the top note as near
 ---the target as it can be, and the lowest note at or above `floor`. Every
 ---rotation is tried in every octave; the nearest top note wins and a tie
----goes to the lower voicing.
+---goes to the lower voicing. A semitone between the top two notes counts
+---as `CLASH_PENALTY` semitones further away.
 ---@param pcs integer[] distinct pitch classes
 ---@param target integer
 ---@param floor integer
@@ -163,6 +167,9 @@ local function place(pcs, target, floor)
     for octave = shift - 24, shift + 24, 12 do
       local low = notes[1] + octave
       local dist = math.abs(top + octave - target)
+      if #notes >= 2 and top - notes[#notes - 1] <= 1 then
+        dist = dist + M.CLASH_PENALTY -- a semitone on top rubs, so prefer another rotation
+      end
       if
         low >= floor
         and (not best_dist or dist < best_dist or (dist == best_dist and low < best[1]))

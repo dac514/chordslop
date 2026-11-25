@@ -82,8 +82,10 @@ for i = 1, #theory.CHORD_TYPES do
       )
       t.check(notes[1] >= 36 and notes[1] <= 47, what .. " bass in C-3..B-3")
       t.eq(notes[1] % 12, voicing.bass_pc(p), what .. " bass pitch class")
-      -- three notes a tone apart (A B C#) can only come within 4 of the target
-      t.check(math.abs(notes[#notes] - voicing.TARGET_TOP) <= 4, what .. " top near target")
+      -- three notes a tone apart (A B C#) can only come within 4 of the target,
+      -- and avoiding a semitone on top can cost one more
+      t.check(math.abs(notes[#notes] - voicing.TARGET_TOP) <= 5, what .. " top near target")
+      t.check(notes[#notes] - notes[#notes - 1] >= 2, what .. " no semitone on top")
       t.check(notes[2] - notes[1] >= voicing.MIN_GAP, what .. " upper notes clear of the bass")
       for k = 2, #notes do
         t.check(notes[k] > notes[k - 1], what .. " ascending")
@@ -97,6 +99,10 @@ for i = 1, #theory.CHORD_TYPES do
     end
   end
 end
+
+-- extended chords avoid a semitone on top: G13 is F A B E, Dm9 is F A C E
+t.eq(list(voicing.notes(pad(7, "13"), voicing.OPEN)), "43,53,57,59,64", "open G13")
+t.eq(list(voicing.notes(pad(2, "m9"), voicing.OPEN)), "38,53,57,60,64", "open Dm9")
 
 -- the octave moves everything; the ends of the range clamp
 local up = voicing.notes(pad(0, "min", 0, 5), voicing.OPEN)

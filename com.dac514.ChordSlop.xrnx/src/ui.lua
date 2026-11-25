@@ -3,7 +3,7 @@
   builder (so the dev bridge can map ids to views), the root view and a
   controller table that `src/app.lua` drives from MIDI and key events.
 
-  Layout (about 960 x 520):
+  Layout (about 1020 x 610):
     header   key, mode, transpose pads | presets
     body     circle of fifths panel    | 4x4 pad grid, pad editor with keyboard, voicing and fit line
     footer   MIDI device, pad 1 note, learn | QWERTY, animate | status
@@ -99,9 +99,9 @@ local TIP_VOICING = "How a pad's chord is spread over the keyboard.\n\n"
   .. "Wide: like Open, with the fifth and the octave above the bass, for pads and strings."
 local TIP_BASS = "Bass note of the selected pad. Inversion: the chord tone that the inversion puts lowest. "
   .. "A note here makes a slash chord, such as F/G: in Open and Wide it replaces the bass, "
-  .. "in Close it sounds an octave below the chord."
+  .. "in Close it sounds just below the chord."
 local TIP_KEYBOARD = "The notes of the selected pad, or of the pads that sound right now. "
-  .. "The bass is amber."
+  .. "The bass is amber. An arrow at either end marks notes beyond the keyboard."
 
 local TIP_LAYOUT = "How the 16 controller notes land on the grid. Rows top to bottom: lowest note top-left. "
   .. "Rows bottom to top: lowest note bottom-left, like a drum machine. MPK mini banks: bank A on the top "
@@ -269,6 +269,8 @@ function M.build(app, palette)
   ---@class KeyboardState
   ---@field lit table<integer, RGB> colour by note
   ---@field bass table<integer, boolean>
+  ---@field below RGB? colour of the arrow for notes below the keyboard
+  ---@field above RGB? colour of the arrow for notes above the keyboard
   local kb = { lit = {}, bass = {} }
 
   ---Colour of the upper notes of a pad: its circle colour, made strong
@@ -282,7 +284,7 @@ function M.build(app, palette)
       if level == "near" then
         hue = colors.BLUE
       elseif level ~= "home" then
-        hue = { 150, 150, 160 }
+        hue = { 105, 105, 120 }
       end
     end
     return hue
@@ -296,7 +298,12 @@ function M.build(app, palette)
     local color = key_color(pad)
     local separate = style() ~= voicing.CLOSE or voicing.has_bass(pad)
     for n, note in ipairs(notes) do
-      if n == 1 and separate then
+      local note_color = (n == 1 and separate) and KEY_BASS or color
+      if note < KB_LOW then
+        kb.below = kb.below or note_color
+      elseif note > KB_HIGH then
+        kb.above = kb.above or note_color
+      elseif n == 1 and separate then
         kb.bass[note] = true
         kb.lit[note] = KEY_BASS
       elseif not kb.bass[note] then
@@ -310,7 +317,7 @@ function M.build(app, palette)
   local sounding = {}
 
   function refresh_keyboard()
-    kb.lit, kb.bass = {}, {}
+    kb.lit, kb.bass, kb.below, kb.above = {}, {}, nil, nil
     local any = false
     for index, pad in pairs(sounding) do
       local held = player.held[index]
@@ -349,6 +356,20 @@ function M.build(app, palette)
         ctx.fill_color = kb.lit[note] or KEY_BLACK
         ctx:begin_path()
         ctx:rect(x, 0, w, KB_BLACK_H)
+        ctx:fill()
+      end
+    end
+    -- notes beyond the keyboard: a small arrow at that end, in their colour
+    local mid = KB_BLACK_H + (KB_H - KB_BLACK_H) / 2
+    for _, side in ipairs { { kb.below, 1, 1 }, { kb.above, KB_W - 2, -1 } } do
+      local color, x, dir = side[1], side[2], side[3]
+      if color then
+        ctx.fill_color = color
+        ctx:begin_path()
+        ctx:move_to(x, mid)
+        ctx:line_to(x + dir * 7, mid - 5)
+        ctx:line_to(x + dir * 7, mid + 5)
+        ctx:close_path()
         ctx:fill()
       end
     end
@@ -901,7 +922,12 @@ function M.build(app, palette)
   ---@return Pad pad, RingChord chord
   local function ring_pad(k, ring)
     local chord = (ring == "outer") and ring_outer[k + 1] or ring_inner[k + 1]
-    return { root = chord.root, type = chord.type, inversion = 0, octave = pads_mod.DEFAULT_OCTAVE },
+    return pads_mod.normalize {
+      root = chord.root,
+      type = chord.type,
+      inversion = 0,
+      octave = pads_mod.DEFAULT_OCTAVE,
+    },
       chord
   end
 
@@ -956,7 +982,12 @@ function M.build(app, palette)
   ---@return Pad
   local function tonic_pad()
     local root, type_index = theory.diatonic_chord(ctl.key, ctl.mode, 1, false)
-    return { root = root, type = type_index, inversion = 0, octave = pads_mod.DEFAULT_OCTAVE }
+    return pads_mod.normalize {
+      root = root,
+      type = type_index,
+      inversion = 0,
+      octave = pads_mod.DEFAULT_OCTAVE,
+    }
   end
 
   ---@param rot number
